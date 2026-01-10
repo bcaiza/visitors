@@ -1,0 +1,164 @@
+import React, { useState, useMemo } from "react";
+import { useLocation, Link } from "react-router-dom";
+import { Layout, Menu, Button, Avatar, Dropdown, Space } from 'antd';
+import {
+  LayoutDashboard,
+  UserCheck,
+  ClipboardList,
+  BarChart3,
+  Users,
+  ShieldCheck,
+  LogOut,
+  Menu as MenuIcon,
+  Sun,
+  Moon,
+} from "lucide-react";
+import { useAuth } from "../context/useAuth";
+import { useTheme } from "../context/useTheme";
+
+const { Sider, Content, Header } = Layout;
+
+const LayoutComponent = ({ children }) => {
+  const { user, logout, hasPermission } = useAuth();
+  const { toggleTheme, isDark } = useTheme();
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+
+  const allMenuItems = [
+    {
+      key: "/dashboard",
+      icon: <LayoutDashboard />,
+      label: <Link to="/dashboard">Dashboard</Link>,
+      module: "dashboard",
+    },
+    {
+      key: "/visitors",
+      icon: <UserCheck />,
+      label: <Link to="/visitors">Visitantes</Link>,
+      module: "visitors",
+    },
+    {
+      key: "/entries",
+      icon: <ClipboardList />,
+      label: <Link to="/entries">Entradas/Salidas</Link>,
+      module: "entries",
+    },
+    {
+      key: "/reports",
+      icon: <BarChart3 />,
+      label: <Link to="/reports">Reportes</Link>,
+      module: "reports",
+    },
+    {
+      key: "admin",
+      icon: <ShieldCheck />,
+      label: "Administración",
+      children: [
+        {
+          key: "/users",
+          icon: <Users />,
+          label: <Link to="/users">Usuarios</Link>,
+          module: "users",
+        },
+        {
+          key: "/roles",
+          icon: <ShieldCheck />,
+          label: <Link to="/roles">Roles</Link>,
+          module: "roles",
+        },
+      ],
+    },
+  ];
+
+  const filterMenuByPermissions = (menuItems) => {
+    return menuItems
+      .map((menu) => {
+        if (menu.children) {
+          const allowedChildren = menu.children.filter((child) =>
+            child.module ? hasPermission(child.module, "view") : true
+          );
+
+          if (allowedChildren.length > 0) {
+            return {
+              ...menu,
+              children: allowedChildren,
+            };
+          }
+          return null;
+        }
+
+        return menu.module && hasPermission(menu.module, "view") ? menu : null;
+      })
+      .filter(Boolean);
+  };
+
+  const menuItems = useMemo(() => {
+    return filterMenuByPermissions(allMenuItems);
+  }, [hasPermission]);
+
+  const getSelectedKeys = () => {
+    const currentPath = location.pathname;
+    for (const item of menuItems) {
+      if (item.children) {
+        const child = item.children.find(c => c.key === currentPath);
+        if (child) return [child.key];
+      } else if (item.key === currentPath) {
+        return [item.key];
+      }
+    }
+    return [];
+  };
+
+  const userMenuItems = [
+    {
+      key: 'theme',
+      icon: isDark ? <Sun /> : <Moon />,
+      label: `Cambiar a ${isDark ? 'claro' : 'oscuro'}`,
+      onClick: toggleTheme,
+    },
+    {
+      key: 'logout',
+      icon: <LogOut />,
+      label: 'Cerrar sesión',
+      onClick: logout,
+    },
+  ];
+
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
+        <div style={{ padding: '16px', textAlign: 'center' }}>
+          <Avatar style={{ backgroundColor: '#1890ff' }}>V</Avatar>
+          {!collapsed && <h3 style={{ color: 'white', marginTop: 8 }}>Control de Visitantes</h3>}
+        </div>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={getSelectedKeys()}
+          items={menuItems}
+        />
+      </Sider>
+      <Layout>
+        <Header style={{ padding: '0 16px', background: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button
+            type="text"
+            icon={<MenuIcon />}
+            onClick={() => setCollapsed(!collapsed)}
+            style={{ fontSize: '16px' }}
+          />
+          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+            <Space>
+              <Avatar>{user?.name?.charAt(0) || 'U'}</Avatar>
+              {!collapsed && <span>{user?.name}</span>}
+            </Space>
+          </Dropdown>
+        </Header>
+        <Content style={{ margin: '24px 16px', padding: 24, background: '#fff' }}>
+          {children}
+        </Content>
+      </Layout>
+    </Layout>
+  );
+};
+
+export default LayoutComponent;

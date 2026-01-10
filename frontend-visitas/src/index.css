@@ -1,0 +1,505 @@
+/* Reset y configuración base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Colores principales */
+  --color-primary: #6366f1;
+  --color-primary-light: #818cf8;
+  --color-primary-dark: #4f46e5;
+  
+  /* Colores de fondo */
+  --bg-light: #ffffff;
+  --bg-gray: #f8fafc;
+  --bg-dark: #0f172a;
+  
+  /* Colores de texto */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  
+  /* Sombras */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  
+  /* Transiciones */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tipografía mejorada */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-gray);
+  overflow-x: hidden;
+}
+
+code {
+  font-family: 'Fira Code', 'Courier New', Consolas, Monaco, monospace;
+  background-color: rgba(99, 102, 241, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-radius: 10px;
+  transition: background var(--transition-base);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+/* Animaciones personalizadas */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Clases de utilidad */
+.fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.4s ease-out;
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-effect {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mejoras para botones de navegación */
+.nav-menu-btn:hover {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  transform: scale(1.05);
+}
+
+.nav-icon-btn:hover {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+.nav-logout-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+.dark .nav-menu-btn:hover,
+.dark .nav-icon-btn:hover {
+  background-color: rgba(129, 140, 248, 0.15) !important;
+}
+
+.dark .nav-logout-btn:hover {
+  background-color: rgba(248, 113, 113, 0.15) !important;
+}
+
+/* Mejoras para el sidebar */
+.sidebar-collapse-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Estilo para el menú lateral */
+.ant-menu-dark.ant-menu-inline .ant-menu-item,
+.ant-menu-dark.ant-menu-inline .ant-menu-submenu-title {
+  margin: 4px 8px;
+  width: calc(100% - 16px);
+  border-radius: 10px;
+  transition: all var(--transition-base);
+}
+
+.ant-menu-dark.ant-menu-inline .ant-menu-item-selected {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.ant-menu-dark.ant-menu-inline .ant-menu-item:hover,
+.ant-menu-dark.ant-menu-inline .ant-menu-submenu-title:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  transform: translateX(4px);
+}
+
+/* Cards mejoradas */
+.ant-card {
+  transition: all var(--transition-base);
+  border: none;
+}
+
+.ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .ant-card:hover {
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.4);
+}
+
+/* Tablas mejoradas */
+.ant-table-wrapper {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-table-thead > tr > th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+.ant-table-tbody > tr {
+  transition: all var(--transition-fast);
+}
+
+.ant-table-tbody > tr:hover {
+  transform: scale(1.01);
+}
+
+/* Botones mejorados */
+.ant-btn {
+  transition: all var(--transition-base);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.ant-btn-primary:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.ant-btn-default:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  transform: translateY(-2px);
+}
+
+/* Inputs mejorados */
+.ant-input,
+.ant-input-number,
+.ant-picker {
+  transition: all var(--transition-base);
+}
+
+.ant-input:focus,
+.ant-input-number:focus,
+.ant-picker:focus,
+.ant-input:hover,
+.ant-input-number:hover,
+.ant-picker:hover {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Modales mejorados */
+.ant-modal-content {
+  animation: fadeIn 0.3s ease-out;
+  overflow: hidden;
+}
+
+.ant-modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: none;
+}
+
+.ant-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Notificaciones mejoradas */
+.ant-notification-notice {
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* Badges mejorados */
+.ant-badge-count {
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+/* Tags mejorados */
+.ant-tag {
+  font-weight: 600;
+  padding: 4px 12px;
+  border: none;
+}
+
+/* Tooltips mejorados */
+.ant-tooltip-inner {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Skeleton loader mejorado */
+.ant-skeleton-element {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.dark .ant-skeleton-element {
+  background: linear-gradient(
+    90deg,
+    #1e293b 25%,
+    #334155 50%,
+    #1e293b 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Progress bars mejorados */
+.ant-progress-bg {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+/* Switches mejorados */
+.ant-switch-checked {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+}
+
+/* Selects mejorados */
+.ant-select-dropdown {
+  border-radius: 10px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Tabs mejorados */
+.ant-tabs-tab {
+  font-weight: 600;
+  transition: all var(--transition-base);
+}
+
+.ant-tabs-tab:hover {
+  color: #6366f1;
+}
+
+.ant-tabs-tab-active {
+  color: #6366f1;
+}
+
+.ant-tabs-ink-bar {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  height: 3px;
+  border-radius: 3px;
+}
+
+/* Drawer mejorado */
+.ant-drawer-content {
+  background: var(--bg-light);
+}
+
+.dark .ant-drawer-content {
+  background: var(--bg-dark);
+}
+
+/* Dividers mejorados */
+.ant-divider {
+  margin: 16px 0;
+}
+
+/* Avatars mejorados */
+.ant-avatar {
+  transition: all var(--transition-base);
+}
+
+.ant-avatar:hover {
+  transform: scale(1.1);
+}
+
+/* Breadcrumb mejorado */
+.ant-breadcrumb {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ant-breadcrumb-link:hover {
+  color: #6366f1;
+}
+
+/* Steps mejorados */
+.ant-steps-item-process .ant-steps-item-icon {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border-color: #6366f1;
+}
+
+/* Pagination mejorada */
+.ant-pagination-item-active {
+  border-color: #6366f1;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+}
+
+.ant-pagination-item-active a {
+  color: #6366f1;
+  font-weight: 600;
+}
+
+/* Alerts mejorados */
+.ant-alert {
+  border-radius: 10px;
+  border: none;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Empty state mejorado */
+.ant-empty-description {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Spin mejorado */
+.ant-spin-dot-item {
+  background-color: #6366f1;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  body {
+    font-size: 13px;
+  }
+  
+  .ant-card {
+    margin-bottom: 16px;
+  }
+  
+  .ant-table {
+    font-size: 12px;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+  }
+  
+  .ant-layout-sider,
+  .ant-layout-header {
+    display: none !important;
+  }
+  
+  .ant-layout-content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* Accesibilidad */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reducir movimiento para usuarios que lo prefieren */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

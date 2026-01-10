@@ -1,0 +1,21 @@
+import User from './User.js';
+import Role from './Role.js';
+import Permission from './Permission.js';
+import Visitor from './Visitor.js';
+import Entry from './Entry.js';
+
+const models = {
+  User,
+  Role,
+  Permission,
+  Visitor,
+  Entry
+};
+
+if (User.associate) User.associate(models);
+if (Role.associate) Role.associate(models);
+if (Permission.associate) Permission.associate(models);
+if (Visitor.associate) Visitor.associate(models);
+if (Entry.associate) Entry.associate(models);
+
+export default models;
