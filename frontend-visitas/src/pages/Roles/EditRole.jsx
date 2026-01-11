@@ -74,6 +74,20 @@ const EditRole = () => {
       icon: '📋'
     },
     {
+  key: 'department',
+  name: 'Departamentos',
+  description: 'Gestión de departamentos',
+  permissions: ['view', 'create', 'edit', 'delete'],
+  icon: '🏢'
+},
+{
+  key: 'visit-purpose',
+  name: 'Propósito de Visita',
+  description: 'Gestión de propósitos de visita',
+  permissions: ['view', 'create', 'edit', 'delete'],
+  icon: '🎯'
+},
+    {
       key: 'users',
       name: 'Usuarios',
       description: 'Administración de usuarios',

@@ -2,6 +2,8 @@ import { Op } from 'sequelize';
 import ExcelJS from 'exceljs';
 import Entry from '../models/Entry.js';
 import Visitor from '../models/Visitor.js';
+import Department from '../models/Department.js';
+import VisitPurpose from '../models/VisitPurpose.js';
 import sequelize from '../config/database.js';
 
 /**
@@ -22,9 +24,9 @@ export const exportDashboardToExcel = async (req, res) => {
       includeMonthly = true,
     } = req.query;
 
-    // Fechas por defecto
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate ? new Date(startDate) : new Date(new Date().setMonth(end.getMonth() - 1));
+    // ✅ Fechas con zona horaria correcta
+    const end = endDate ? new Date(endDate + 'T23:59:59.999Z') : new Date();
+    const start = startDate ? new Date(startDate + 'T00:00:00.000Z') : new Date(new Date().setMonth(end.getMonth() - 1));
 
     const whereClause = {
       checkInTime: {
@@ -118,7 +120,6 @@ export const exportDashboardToExcel = async (req, res) => {
         summarySheet.getCell(`C${rowNum}`).value = row[2];
 
         if (index === 0) {
-          // Encabezados
           summarySheet.getRow(rowNum).font = { bold: true, color: { argb: 'FFFFFFFF' } };
           summarySheet.getRow(rowNum).fill = {
             type: 'pattern',
@@ -126,7 +127,6 @@ export const exportDashboardToExcel = async (req, res) => {
             fgColor: { argb: 'FF4472C4' },
           };
         } else {
-          // Alternar colores de fila
           if (index % 2 === 0) {
             summarySheet.getRow(rowNum).fill = {
               type: 'pattern',
@@ -152,12 +152,10 @@ export const exportDashboardToExcel = async (req, res) => {
         });
       }
 
-      // Ancho de columnas
       summarySheet.getColumn('A').width = 35;
       summarySheet.getColumn('B').width = 20;
       summarySheet.getColumn('C').width = 45;
 
-      // Formato de números
       summarySheet.getCell('B6').numFmt = '#,##0';
       summarySheet.getCell('B7').numFmt = '#,##0';
       summarySheet.getCell('B8').numFmt = '#,##0';
@@ -180,7 +178,6 @@ export const exportDashboardToExcel = async (req, res) => {
         raw: true,
       });
 
-      // Título
       entriesSheet.mergeCells('A1:C1');
       entriesSheet.getCell('A1').value = 'ENTRADAS POR DÍA';
       entriesSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -192,7 +189,6 @@ export const exportDashboardToExcel = async (req, res) => {
       entriesSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       entriesSheet.getRow(1).height = 25;
 
-      // Encabezados
       entriesSheet.getCell('A3').value = 'Fecha';
       entriesSheet.getCell('B3').value = 'Día de la Semana';
       entriesSheet.getCell('C3').value = 'Cantidad de Entradas';
@@ -203,7 +199,6 @@ export const exportDashboardToExcel = async (req, res) => {
         fgColor: { argb: 'FF4472C4' },
       };
 
-      // Datos
       entriesByDay.forEach((entry, index) => {
         const rowNum = 4 + index;
         const date = new Date(entry.date);
@@ -214,7 +209,6 @@ export const exportDashboardToExcel = async (req, res) => {
         entriesSheet.getCell(`B${rowNum}`).value = dayNames[date.getDay()];
         entriesSheet.getCell(`C${rowNum}`).value = parseInt(entry.count);
 
-        // Alternar colores
         if (index % 2 === 1) {
           entriesSheet.getRow(rowNum).fill = {
             type: 'pattern',
@@ -224,7 +218,6 @@ export const exportDashboardToExcel = async (req, res) => {
         }
       });
 
-      // Totales
       const totalRow = 4 + entriesByDay.length;
       entriesSheet.getCell(`A${totalRow}`).value = 'TOTAL';
       entriesSheet.getCell(`A${totalRow}`).font = { bold: true };
@@ -239,7 +232,6 @@ export const exportDashboardToExcel = async (req, res) => {
         fgColor: { argb: 'FFFFE699' },
       };
 
-      // Bordes
       for (let i = 3; i <= totalRow; i++) {
         ['A', 'B', 'C'].forEach(col => {
           entriesSheet.getCell(`${col}${i}`).border = {
@@ -251,18 +243,9 @@ export const exportDashboardToExcel = async (req, res) => {
         });
       }
 
-      // Columnas
       entriesSheet.getColumn('A').width = 15;
       entriesSheet.getColumn('B').width = 20;
       entriesSheet.getColumn('C').width = 20;
-
-      // Agregar gráfico de línea
-      if (entriesByDay.length > 0) {
-        entriesSheet.addChart = (chartData) => {
-          // Nota: ExcelJS tiene soporte limitado para gráficos
-          // Los datos están preparados para que puedan ser graficados manualmente o con una biblioteca adicional
-        };
-      }
     }
 
     // ==================== HOJA 3: TOP VISITANTES ====================
@@ -288,7 +271,6 @@ export const exportDashboardToExcel = async (req, res) => {
         raw: false,
       });
 
-      // Título
       visitorsSheet.mergeCells('A1:F1');
       visitorsSheet.getCell('A1').value = 'TOP 20 VISITANTES MÁS FRECUENTES';
       visitorsSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -300,10 +282,9 @@ export const exportDashboardToExcel = async (req, res) => {
       visitorsSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       visitorsSheet.getRow(1).height = 25;
 
-      // Encabezados
       const headers = ['Ranking', 'Nombre', 'Apellido', 'Empresa', 'Email', 'Cantidad de Visitas'];
       headers.forEach((header, index) => {
-        const col = String.fromCharCode(65 + index); // A, B, C, etc.
+        const col = String.fromCharCode(65 + index);
         visitorsSheet.getCell(`${col}3`).value = header;
       });
       visitorsSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -313,7 +294,6 @@ export const exportDashboardToExcel = async (req, res) => {
         fgColor: { argb: 'FF4472C4' },
       };
 
-      // Datos
       topVisitors.forEach((entry, index) => {
         const rowNum = 4 + index;
         visitorsSheet.getCell(`A${rowNum}`).value = index + 1;
@@ -323,12 +303,11 @@ export const exportDashboardToExcel = async (req, res) => {
         visitorsSheet.getCell(`E${rowNum}`).value = entry.visitor.email || 'N/A';
         visitorsSheet.getCell(`F${rowNum}`).value = parseInt(entry.get('visitCount'));
 
-        // Destacar top 3
         if (index < 3) {
           visitorsSheet.getRow(rowNum).fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FFFFD700' }, // Dorado
+            fgColor: { argb: 'FFFFD700' },
           };
           visitorsSheet.getRow(rowNum).font = { bold: true };
         } else if (index % 2 === 1) {
@@ -340,7 +319,6 @@ export const exportDashboardToExcel = async (req, res) => {
         }
       });
 
-      // Bordes
       const lastRow = 3 + topVisitors.length;
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C', 'D', 'E', 'F'].forEach(col => {
@@ -353,7 +331,6 @@ export const exportDashboardToExcel = async (req, res) => {
         });
       }
 
-      // Columnas
       visitorsSheet.getColumn('A').width = 10;
       visitorsSheet.getColumn('B').width = 20;
       visitorsSheet.getColumn('C').width = 20;
@@ -363,223 +340,133 @@ export const exportDashboardToExcel = async (req, res) => {
     }
 
     // ==================== HOJA 4: POR DEPARTAMENTO ====================
-    // ==================== HOJA 4: POR DEPARTAMENTO ====================
-if (includeDepartments) {
-  const deptSheet = workbook.addWorksheet('Por Departamento');
+    if (includeDepartments) {
+      const deptSheet = workbook.addWorksheet('Por Departamento');
 
-  // ✅ CAMBIO AQUÍ
-  const byDepartment = await Entry.findAll({
-    attributes: [
-      'department_id',
-      [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
-    ],
-    include: [
-      {
-        model: Department,
-        as: 'department',
-        attributes: ['id', 'name'],
-      },
-    ],
-    where: {
-      ...whereClause,
-      department_id: { [Op.ne]: null },
-    },
-    group: ['Entry.department_id', 'department.id', 'department.name'],
-    order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
-    raw: false,
-  });
+      const byDepartment = await Entry.findAll({
+        attributes: [
+          'department_id',
+          [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
+        ],
+        include: [
+          {
+            model: Department,
+            as: 'department',
+            attributes: ['id', 'name'],
+          },
+        ],
+        where: {
+          ...whereClause,
+          department_id: { [Op.ne]: null },
+        },
+        group: ['Entry.department_id', 'department.id', 'department.name'],
+        order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
+        raw: false,
+      });
 
-  // Título
-  deptSheet.mergeCells('A1:D1');
-  deptSheet.getCell('A1').value = 'VISITAS POR DEPARTAMENTO';
-  deptSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-  deptSheet.getCell('A1').fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF722ED1' },
-  };
-  deptSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-  deptSheet.getRow(1).height = 25;
-
-  // Encabezados
-  deptSheet.getCell('A3').value = 'Departamento';
-  deptSheet.getCell('B3').value = 'Cantidad';
-  deptSheet.getCell('C3').value = 'Porcentaje';
-  deptSheet.getCell('D3').value = 'Gráfico';
-  deptSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  deptSheet.getRow(3).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF4472C4' },
-  };
-
-  const totalDept = byDepartment.reduce((sum, d) => sum + parseInt(d.getDataValue('count')), 0);
-
-  byDepartment.forEach((entry, index) => {
-    const rowNum = 4 + index;
-    const count = parseInt(entry.getDataValue('count'));
-    const percentage = (count / totalDept) * 100;
-
-    deptSheet.getCell(`A${rowNum}`).value = entry.department?.name || 'Sin departamento';  // ✅ CAMBIO
-    deptSheet.getCell(`B${rowNum}`).value = count;
-    deptSheet.getCell(`C${rowNum}`).value = percentage / 100;
-    deptSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
-
-    // Barra de progreso visual
-    const barLength = Math.round((percentage / 100) * 20);
-    deptSheet.getCell(`D${rowNum}`).value = '█'.repeat(barLength);
-
-    if (index % 2 === 1) {
-      deptSheet.getRow(rowNum).fill = {
+      deptSheet.mergeCells('A1:D1');
+      deptSheet.getCell('A1').value = 'VISITAS POR DEPARTAMENTO';
+      deptSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+      deptSheet.getCell('A1').fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FFF0F0F0' },
+        fgColor: { argb: 'FF722ED1' },
       };
-    }
-  });
+      deptSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      deptSheet.getRow(1).height = 25;
 
-  // Total
-  const totalRow = 4 + byDepartment.length;
-  deptSheet.getCell(`A${totalRow}`).value = 'TOTAL';
-  deptSheet.getCell(`A${totalRow}`).font = { bold: true };
-  deptSheet.getCell(`B${totalRow}`).value = totalDept;
-  deptSheet.getCell(`B${totalRow}`).font = { bold: true };
-  deptSheet.getCell(`C${totalRow}`).value = 1;
-  deptSheet.getCell(`C${totalRow}`).numFmt = '0.0%';
-  deptSheet.getCell(`C${totalRow}`).font = { bold: true };
-  deptSheet.getRow(totalRow).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFFFE699' },
-  };
-
-  // Bordes
-  for (let i = 3; i <= totalRow; i++) {
-    ['A', 'B', 'C', 'D'].forEach(col => {
-      deptSheet.getCell(`${col}${i}`).border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
-    });
-  }
-
-  deptSheet.getColumn('A').width = 30;
-  deptSheet.getColumn('B').width = 15;
-  deptSheet.getColumn('C').width = 15;
-  deptSheet.getColumn('D').width = 30;
-}
-
-// ==================== HOJA 5: POR MOTIVO ====================
-if (includePurposes) {
-  const purposeSheet = workbook.addWorksheet('Por Motivo');
-
-  // ✅ CAMBIO AQUÍ
-  const byPurpose = await Entry.findAll({
-    attributes: [
-      'purpose_id',
-      [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
-    ],
-    include: [
-      {
-        model: VisitPurpose,
-        as: 'purpose',
-        attributes: ['id', 'name'],
-      },
-    ],
-    where: {
-      ...whereClause,
-      purpose_id: { [Op.ne]: null },
-    },
-    group: ['Entry.purpose_id', 'purpose.id', 'purpose.name'],
-    order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
-    limit: 15,
-    raw: false,
-  });
-
-  // Título
-  purposeSheet.mergeCells('A1:C1');
-  purposeSheet.getCell('A1').value = 'MOTIVOS DE VISITA';
-  purposeSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-  purposeSheet.getCell('A1').fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFFA8C16' },
-  };
-  purposeSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-  purposeSheet.getRow(1).height = 25;
-
-  // Encabezados
-  purposeSheet.getCell('A3').value = 'Motivo';
-  purposeSheet.getCell('B3').value = 'Cantidad';
-  purposeSheet.getCell('C3').value = 'Porcentaje';
-  purposeSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  purposeSheet.getRow(3).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF4472C4' },
-  };
-
-  const totalPurpose = byPurpose.reduce((sum, p) => sum + parseInt(p.getDataValue('count')), 0);
-
-  byPurpose.forEach((entry, index) => {
-    const rowNum = 4 + index;
-    const count = parseInt(entry.getDataValue('count'));
-    const percentage = (count / totalPurpose) * 100;
-
-    purposeSheet.getCell(`A${rowNum}`).value = entry.purpose?.name || 'Sin motivo';  // ✅ CAMBIO
-    purposeSheet.getCell(`B${rowNum}`).value = count;
-    purposeSheet.getCell(`C${rowNum}`).value = percentage / 100;
-    purposeSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
-
-    if (index % 2 === 1) {
-      purposeSheet.getRow(rowNum).fill = {
+      deptSheet.getCell('A3').value = 'Departamento';
+      deptSheet.getCell('B3').value = 'Cantidad';
+      deptSheet.getCell('C3').value = 'Porcentaje';
+      deptSheet.getCell('D3').value = 'Gráfico';
+      deptSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      deptSheet.getRow(3).fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FFF0F0F0' },
+        fgColor: { argb: 'FF4472C4' },
       };
+
+      const totalDept = byDepartment.reduce((sum, d) => sum + parseInt(d.getDataValue('count')), 0);
+
+      byDepartment.forEach((entry, index) => {
+        const rowNum = 4 + index;
+        const count = parseInt(entry.getDataValue('count'));
+        const percentage = (count / totalDept) * 100;
+
+        deptSheet.getCell(`A${rowNum}`).value = entry.department?.name || 'Sin departamento';
+        deptSheet.getCell(`B${rowNum}`).value = count;
+        deptSheet.getCell(`C${rowNum}`).value = percentage / 100;
+        deptSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
+
+        const barLength = Math.round((percentage / 100) * 20);
+        deptSheet.getCell(`D${rowNum}`).value = '█'.repeat(barLength);
+
+        if (index % 2 === 1) {
+          deptSheet.getRow(rowNum).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF0F0F0' },
+          };
+        }
+      });
+
+      const totalRow = 4 + byDepartment.length;
+      deptSheet.getCell(`A${totalRow}`).value = 'TOTAL';
+      deptSheet.getCell(`A${totalRow}`).font = { bold: true };
+      deptSheet.getCell(`B${totalRow}`).value = totalDept;
+      deptSheet.getCell(`B${totalRow}`).font = { bold: true };
+      deptSheet.getCell(`C${totalRow}`).value = 1;
+      deptSheet.getCell(`C${totalRow}`).numFmt = '0.0%';
+      deptSheet.getCell(`C${totalRow}`).font = { bold: true };
+      deptSheet.getRow(totalRow).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFE699' },
+      };
+
+      for (let i = 3; i <= totalRow; i++) {
+        ['A', 'B', 'C', 'D'].forEach(col => {
+          deptSheet.getCell(`${col}${i}`).border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+          };
+        });
+      }
+
+      deptSheet.getColumn('A').width = 30;
+      deptSheet.getColumn('B').width = 15;
+      deptSheet.getColumn('C').width = 15;
+      deptSheet.getColumn('D').width = 30;
     }
-  });
-
-  // Bordes
-  const lastRow = 3 + byPurpose.length;
-  for (let i = 3; i <= lastRow; i++) {
-    ['A', 'B', 'C'].forEach(col => {
-      purposeSheet.getCell(`${col}${i}`).border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
-    });
-  }
-
-  purposeSheet.getColumn('A').width = 40;
-  purposeSheet.getColumn('B').width = 15;
-  purposeSheet.getColumn('C').width = 15;
-}
 
     // ==================== HOJA 5: POR MOTIVO ====================
     if (includePurposes) {
       const purposeSheet = workbook.addWorksheet('Por Motivo');
 
       const byPurpose = await Entry.findAll({
+        attributes: [
+          'purpose_id',
+          [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
+        ],
+        include: [
+          {
+            model: VisitPurpose,
+            as: 'purpose',
+            attributes: ['id', 'name'],
+          },
+        ],
         where: {
           ...whereClause,
-          purpose: { [Op.ne]: null },
+          purpose_id: { [Op.ne]: null },
         },
-        attributes: [
-          'purpose',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        ],
-        group: ['purpose'],
-        order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+        group: ['Entry.purpose_id', 'purpose.id', 'purpose.name'],
+        order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
         limit: 15,
-        raw: true,
+        raw: false,
       });
 
-      // Título
       purposeSheet.mergeCells('A1:C1');
       purposeSheet.getCell('A1').value = 'MOTIVOS DE VISITA';
       purposeSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -591,7 +478,6 @@ if (includePurposes) {
       purposeSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       purposeSheet.getRow(1).height = 25;
 
-      // Encabezados
       purposeSheet.getCell('A3').value = 'Motivo';
       purposeSheet.getCell('B3').value = 'Cantidad';
       purposeSheet.getCell('C3').value = 'Porcentaje';
@@ -602,14 +488,14 @@ if (includePurposes) {
         fgColor: { argb: 'FF4472C4' },
       };
 
-      const totalPurpose = byPurpose.reduce((sum, p) => sum + parseInt(p.count), 0);
+      const totalPurpose = byPurpose.reduce((sum, p) => sum + parseInt(p.getDataValue('count')), 0);
 
-      byPurpose.forEach((purpose, index) => {
+      byPurpose.forEach((entry, index) => {
         const rowNum = 4 + index;
-        const count = parseInt(purpose.count);
+        const count = parseInt(entry.getDataValue('count'));
         const percentage = (count / totalPurpose) * 100;
 
-        purposeSheet.getCell(`A${rowNum}`).value = purpose.purpose;
+        purposeSheet.getCell(`A${rowNum}`).value = entry.purpose?.name || 'Sin motivo';
         purposeSheet.getCell(`B${rowNum}`).value = count;
         purposeSheet.getCell(`C${rowNum}`).value = percentage / 100;
         purposeSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
@@ -623,7 +509,6 @@ if (includePurposes) {
         }
       });
 
-      // Bordes
       const lastRow = 3 + byPurpose.length;
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C'].forEach(col => {
@@ -656,7 +541,6 @@ if (includePurposes) {
         raw: true,
       });
 
-      // Título
       hoursSheet.mergeCells('A1:D1');
       hoursSheet.getCell('A1').value = 'HORAS PICO DE ENTRADA';
       hoursSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -668,7 +552,6 @@ if (includePurposes) {
       hoursSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       hoursSheet.getRow(1).height = 25;
 
-      // Encabezados
       hoursSheet.getCell('A3').value = 'Hora';
       hoursSheet.getCell('B3').value = 'Rango';
       hoursSheet.getCell('C3').value = 'Cantidad';
@@ -680,7 +563,6 @@ if (includePurposes) {
         fgColor: { argb: 'FF4472C4' },
       };
 
-      // Ordenar por hora
       const sortedHours = peakHours.sort((a, b) => a.hour - b.hour);
       const maxCount = Math.max(...sortedHours.map(h => parseInt(h.count)));
 
@@ -693,7 +575,6 @@ if (includePurposes) {
         hoursSheet.getCell(`B${rowNum}`).value = `${hourNum}:00 - ${hourNum + 1}:00`;
         hoursSheet.getCell(`C${rowNum}`).value = count;
 
-        // Barra proporcional
         const barLength = Math.round((count / maxCount) * 30);
         hoursSheet.getCell(`D${rowNum}`).value = '▓'.repeat(barLength);
         hoursSheet.getCell(`D${rowNum}`).font = { color: { argb: 'FF52C41A' } };
@@ -706,7 +587,6 @@ if (includePurposes) {
           };
         }
 
-        // Destacar hora pico
         if (count === maxCount) {
           hoursSheet.getRow(rowNum).fill = {
             type: 'pattern',
@@ -717,7 +597,6 @@ if (includePurposes) {
         }
       });
 
-      // Bordes
       const lastRow = 3 + sortedHours.length;
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C', 'D'].forEach(col => {
@@ -758,7 +637,6 @@ if (includePurposes) {
         raw: true,
       });
 
-      // Título
       monthlySheet.mergeCells('A1:C1');
       monthlySheet.getCell('A1').value = 'TENDENCIA MENSUAL';
       monthlySheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -770,7 +648,6 @@ if (includePurposes) {
       monthlySheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       monthlySheet.getRow(1).height = 25;
 
-      // Encabezados
       monthlySheet.getCell('A3').value = 'Mes';
       monthlySheet.getCell('B3').value = 'Cantidad de Entradas';
       monthlySheet.getCell('C3').value = 'Variación vs. Anterior';
@@ -797,7 +674,6 @@ if (includePurposes) {
           monthlySheet.getCell(`C${rowNum}`).value = variation / 100;
           monthlySheet.getCell(`C${rowNum}`).numFmt = '0.0%';
           
-          // Color según variación
           if (variation > 0) {
             monthlySheet.getCell(`C${rowNum}`).font = { color: { argb: 'FF52C41A' } };
           } else if (variation < 0) {
@@ -818,7 +694,6 @@ if (includePurposes) {
         }
       });
 
-      // Bordes
       const lastRow = 3 + monthlyData.length;
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C'].forEach(col => {

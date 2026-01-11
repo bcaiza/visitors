@@ -41,6 +41,8 @@ const NewRole = () => {
     entries: { view: false, create: false, edit: false, delete: false },
     users: { view: false, create: false, edit: false, delete: false },
     roles: { view: false, create: false, edit: false, delete: false },
+    department: { view: false, create: false, edit: false, delete: false },
+    'visit-purpose': { view: false, create: false, edit: false, delete: false },
   });
 
   // Definición de módulos con sus permisos disponibles
@@ -66,6 +68,20 @@ const NewRole = () => {
       permissions: ['view', 'create', 'edit', 'delete'],
       icon: '📋'
     },
+    {
+  key: 'department',
+  name: 'Departamentos',
+  description: 'Gestión de departamentos',
+  permissions: ['view', 'create', 'edit', 'delete'],
+  icon: '🏢'
+},
+{
+  key: 'visit-purpose',
+  name: 'Propósito de Visita',
+  description: 'Gestión de propósitos de visita',
+  permissions: ['view', 'create', 'edit', 'delete'],
+  icon: '🎯'
+},
     {
       key: 'users',
       name: 'Usuarios',

@@ -88,44 +88,44 @@ const Dashboard = () => {
   }, []); // Solo se ejecuta una vez al montar
 
   // -------------------- FUNCTIONS --------------------
-  const loadDashboardData = async (customRange = null) => {
-    // ✅ Usar customRange si se proporciona, sino usar dateRange del estado
-    const range = customRange || dateRange;
-    
-    if (!range || !range[0] || !range[1]) {
-      message.warning('Selecciona un rango de fechas válido');
-      return;
-    }
+ const loadDashboardData = async (customRange = null) => {
+  const range = customRange || dateRange;
+  
+  if (!range || !range[0] || !range[1]) {
+    message.warning('Selecciona un rango de fechas válido');
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const params = {
-        startDate: range[0].format('YYYY-MM-DD'),
-        endDate: range[1].format('YYYY-MM-DD'),
-      };
+  setLoading(true);
+  try {
+    const params = {
+      startDate: range[0].format('YYYY-MM-DD'),
+      // ✅ AGREGA UN DÍA AL FINAL PARA INCLUIR TODO EL DÍA
+      endDate: range[1].add(1, 'day').format('YYYY-MM-DD'),
+    };
 
-      console.log('🔍 Cargando dashboard con parámetros:', params); // ✅ Para debug
+    console.log('🔍 Cargando dashboard con parámetros:', params);
 
-      const data = await reportService.getAllDashboardData(params);
+    const data = await reportService.getAllDashboardData(params);
 
-      console.log('✅ Datos recibidos:', data); // ✅ Para debug
+    console.log('✅ Datos recibidos:', data);
 
-      setOverview(data.overview);
-      setEntriesByDay(data.entriesByDay?.data || []);
-      setTopVisitors(data.topVisitors?.topVisitors || []);
-      setByDepartment(data.byDepartment?.departments || []);
-      setByPurpose(data.byPurpose?.purposes || []);
-      setPeakHours(data.peakHours?.hours || []);
-      setMonthlyData(data.monthlyComparison?.months || []);
+    setOverview(data.overview);
+    setEntriesByDay(data.entriesByDay?.data || []);
+    setTopVisitors(data.topVisitors?.topVisitors || []);
+    setByDepartment(data.byDepartment?.departments || []);
+    setByPurpose(data.byPurpose?.purposes || []);
+    setPeakHours(data.peakHours?.hours || []);
+    setMonthlyData(data.monthlyComparison?.months || []);
 
-      message.success('Datos cargados exitosamente');
-    } catch (error) {
-      console.error('❌ Error al cargar datos del dashboard:', error);
-      message.error('Error al cargar datos del dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
+    message.success('Datos cargados exitosamente');
+  } catch (error) {
+    console.error('❌ Error al cargar datos del dashboard:', error);
+    message.error('Error al cargar datos del dashboard');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleExport = async (type, format) => {
     if (!dateRange || !dateRange[0] || !dateRange[1]) {
