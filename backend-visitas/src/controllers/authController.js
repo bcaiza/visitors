@@ -188,7 +188,7 @@ export const verifyToken = async (req, res) => {
       return res.status(401).json({ message: 'Token no proporcionado' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key');
 
     const user = await User.findByPk(decoded.id, {
       include: {
