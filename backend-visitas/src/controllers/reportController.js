@@ -3,6 +3,8 @@ import ExcelJS from 'exceljs';
 import { Parser } from 'json2csv';
 import Entry from '../models/Entry.js';
 import Visitor from '../models/Visitor.js';
+import Department from '../models/Department.js';
+import VisitPurpose from '../models/VisitPurpose.js';
 import sequelize from '../config/database.js';
 
 // ==================== EXPORTACIÓN A EXCEL ====================
@@ -132,6 +134,16 @@ export const exportEntriesToExcel = async (req, res) => {
           as: 'visitor',
           attributes: ['firstName', 'lastName', 'idNumber', 'company'],
         },
+        {
+          model: Department,
+          as: 'department',
+          attributes: ['name'],
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose',
+          attributes: ['name'],
+        },
       ],
       order: [['checkInTime', 'DESC']],
     });
@@ -147,7 +159,7 @@ export const exportEntriesToExcel = async (req, res) => {
       { header: 'Empresa', key: 'company', width: 25 },
       { header: 'Motivo', key: 'purpose', width: 30 },
       { header: 'Anfitrión', key: 'hostName', width: 25 },
-      { header: 'Departamento', key: 'hostDepartment', width: 20 },
+      { header: 'Departamento', key: 'department', width: 20 },
       { header: 'Gafete', key: 'badge', width: 12 },
       { header: 'Vehículo', key: 'vehiclePlate', width: 15 },
       { header: 'Temperatura', key: 'temperature', width: 12 },
@@ -183,9 +195,9 @@ export const exportEntriesToExcel = async (req, res) => {
         visitorName: `${entry.visitor.firstName} ${entry.visitor.lastName}`,
         idNumber: entry.visitor.idNumber,
         company: entry.visitor.company || 'N/A',
-        purpose: entry.purpose || 'N/A',
+        purpose: entry.purpose?.name || 'N/A', // ⬅️ CAMBIO
         hostName: entry.hostName || 'N/A',
-        hostDepartment: entry.hostDepartment || 'N/A',
+        department: entry.department?.name || 'N/A', // ⬅️ CAMBIO
         badge: entry.badge || 'N/A',
         vehiclePlate: entry.vehiclePlate || 'N/A',
         temperature: entry.temperature || 'N/A',
@@ -327,6 +339,16 @@ export const exportEntriesToCSV = async (req, res) => {
           as: 'visitor',
           attributes: ['firstName', 'lastName', 'idNumber', 'company'],
         },
+        {
+          model: Department,
+          as: 'department',
+          attributes: ['name'],
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose',
+          attributes: ['name'],
+        },
       ],
       order: [['checkInTime', 'DESC']],
     });
@@ -339,7 +361,7 @@ export const exportEntriesToCSV = async (req, res) => {
       { label: 'Empresa', value: 'company' },
       { label: 'Motivo', value: 'purpose' },
       { label: 'Anfitrión', value: 'hostName' },
-      { label: 'Departamento', value: 'hostDepartment' },
+      { label: 'Departamento', value: 'department' },
       { label: 'Gafete', value: 'badge' },
       { label: 'Vehículo', value: 'vehiclePlate' },
       { label: 'Temperatura', value: 'temperature' },
@@ -366,9 +388,9 @@ export const exportEntriesToCSV = async (req, res) => {
         visitorName: `${entry.visitor.firstName} ${entry.visitor.lastName}`,
         idNumber: entry.visitor.idNumber,
         company: entry.visitor.company || '',
-        purpose: entry.purpose || '',
+        purpose: entry.purpose?.name || '', // ⬅️ CAMBIO
         hostName: entry.hostName || '',
-        hostDepartment: entry.hostDepartment || '',
+        department: entry.department?.name || '', // ⬅️ CAMBIO
         badge: entry.badge || '',
         vehiclePlate: entry.vehiclePlate || '',
         temperature: entry.temperature || '',
@@ -604,26 +626,33 @@ export const getEntriesByDepartment = async (req, res) => {
       };
     }
 
-    const byDepartment = await Entry.findAll({
+    const results = await Entry.findAll({
+      attributes: [
+        'department_id',
+        [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
+      ],
+      include: [
+        {
+          model: Department,
+          as: 'department',
+          attributes: ['id', 'name'],
+        },
+      ],
       where: {
         ...whereClause,
-        hostDepartment: { [Op.ne]: null },
+        department_id: { [Op.ne]: null },
       },
-      attributes: [
-        'hostDepartment',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-      ],
-      group: ['hostDepartment'],
-      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
-      raw: true,
+      group: ['Entry.department_id', 'department.id', 'department.name'],
+      order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
+      raw: false,
     });
 
-    res.json({
-      departments: byDepartment.map((dept) => ({
-        department: dept.hostDepartment,
-        count: parseInt(dept.count),
-      })),
-    });
+    const formatted = results.map((entry) => ({
+      department: entry.department?.name || 'Sin departamento',
+      count: parseInt(entry.getDataValue('count')),
+    }));
+
+    res.json({ departments: formatted });
   } catch (error) {
     console.error('Error al obtener visitas por departamento:', error);
     res.status(500).json({
@@ -648,27 +677,34 @@ export const getEntriesByPurpose = async (req, res) => {
       };
     }
 
-    const byPurpose = await Entry.findAll({
+    const results = await Entry.findAll({
+      attributes: [
+        'purpose_id',
+        [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
+      ],
+      include: [
+        {
+          model: VisitPurpose,
+          as: 'purpose',
+          attributes: ['id', 'name'],
+        },
+      ],
       where: {
         ...whereClause,
-        purpose: { [Op.ne]: null },
+        purpose_id: { [Op.ne]: null },
       },
-      attributes: [
-        'purpose',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-      ],
-      group: ['purpose'],
-      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      group: ['Entry.purpose_id', 'purpose.id', 'purpose.name'],
+      order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
       limit: parseInt(limit),
-      raw: true,
+      raw: false,
     });
 
-    res.json({
-      purposes: byPurpose.map((p) => ({
-        purpose: p.purpose,
-        count: parseInt(p.count),
-      })),
-    });
+    const formatted = results.map((entry) => ({
+      purpose: entry.purpose?.name || 'Sin motivo',
+      count: parseInt(entry.getDataValue('count')),
+    }));
+
+    res.json({ purposes: formatted });
   } catch (error) {
     console.error('Error al obtener visitas por motivo:', error);
     res.status(500).json({

@@ -34,6 +34,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import entryService from '../../services/entryService';
+import departmentService from '../../services/departmentService';
+import visitPurposeService from '../../services/visitPurposeService';
 import { useTheme } from '../../context/useTheme.jsx';
 
 const { RangePicker } = DatePicker;
@@ -46,6 +48,8 @@ const EntryList = () => {
 
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [purposes, setPurposes] = useState([]);
 
   const [pagination, setPagination] = useState({
     current: 1,
@@ -64,22 +68,39 @@ const EntryList = () => {
     search: '',
     status: '',
     dateRange: null,
-    hostDepartment: '',
+    department_id: '', // ⬅️ CAMBIO
+    purpose_id: '',    // ⬅️ NUEVO
   });
 
-  // 🔑 MODO DE VISTA
-  // all = normal
-  // today = solo entradas de hoy
   const [viewMode, setViewMode] = useState('all');
+
+  useEffect(() => {
+    loadDepartments();
+    loadPurposes();
+  }, []);
 
   useEffect(() => {
     loadEntries();
     loadStats();
   }, [pagination.current, pagination.pageSize, filters, viewMode]);
 
-  // ========================
-  // CARGAR ENTRADAS
-  // ========================
+  const loadDepartments = async () => {
+    try {
+      const data = await departmentService.getActive();
+      setDepartments(data);
+    } catch (error) {
+      console.error('Error al cargar departamentos:', error);
+    }
+  };
+
+  const loadPurposes = async () => {
+    try {
+      const data = await visitPurposeService.getActive();
+      setPurposes(data);
+    } catch (error) {
+      console.error('Error al cargar motivos:', error);
+    }
+  };
 
   const loadEntries = async () => {
     setLoading(true);
@@ -91,12 +112,9 @@ const EntryList = () => {
 
       let response;
 
-      // 🟢 VER HOY (endpoint correcto)
       if (viewMode === 'today') {
         if (filters.status) params.status = filters.status;
-
         response = await entryService.getToday(params);
-
         setEntries(response.entries);
         setPagination((prev) => ({
           ...prev,
@@ -105,10 +123,10 @@ const EntryList = () => {
         return;
       }
 
-      // 🟢 NORMAL / ACTIVOS
       if (filters.search) params.search = filters.search;
       if (filters.status) params.status = filters.status;
-      if (filters.hostDepartment) params.hostDepartment = filters.hostDepartment;
+      if (filters.department_id) params.department_id = filters.department_id; // ⬅️ CAMBIO
+      if (filters.purpose_id) params.purpose_id = filters.purpose_id;           // ⬅️ NUEVO
 
       if (filters.dateRange?.length === 2) {
         params.startDate = filters.dateRange[0].format('YYYY-MM-DD');
@@ -139,20 +157,15 @@ const EntryList = () => {
     }
   };
 
-  // ========================
-  // FILTROS RÁPIDOS
-  // ========================
-
   const filterToday = () => {
     setViewMode('today');
-
     setFilters({
       search: '',
       status: '',
       dateRange: null,
-      hostDepartment: '',
+      department_id: '',
+      purpose_id: '',
     });
-
     setPagination((prev) => ({
       ...prev,
       current: 1,
@@ -161,14 +174,13 @@ const EntryList = () => {
 
   const filterActive = () => {
     setViewMode('all');
-
     setFilters({
       search: '',
       status: 'active',
       dateRange: null,
-      hostDepartment: '',
+      department_id: '',
+      purpose_id: '',
     });
-
     setPagination((prev) => ({
       ...prev,
       current: 1,
@@ -177,12 +189,12 @@ const EntryList = () => {
 
   const clearFilters = () => {
     setViewMode('all');
-
     setFilters({
       search: '',
       status: '',
       dateRange: null,
-      hostDepartment: '',
+      department_id: '',
+      purpose_id: '',
     });
   };
 
@@ -191,10 +203,6 @@ const EntryList = () => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPagination((prev) => ({ ...prev, current: 1 }));
   };
-
-  // ========================
-  // ACCIONES
-  // ========================
 
   const handleCheckOut = (entry) => {
     confirm({
@@ -226,10 +234,6 @@ const EntryList = () => {
     });
   };
 
-  // ========================
-  // UTILIDADES
-  // ========================
-
   const getStatusTag = (status) => {
     const map = {
       active: { color: 'success', text: 'Activo', icon: <ClockCircleOutlined /> },
@@ -245,10 +249,6 @@ const EntryList = () => {
     const minutes = entryService.calculateStayDuration(entry);
     return entryService.formatDuration(minutes);
   };
-
-  // ========================
-  // COLUMNAS
-  // ========================
 
   const columns = [
     {
@@ -270,6 +270,14 @@ const EntryList = () => {
       ),
     },
     { title: 'Estado', dataIndex: 'status', render: getStatusTag },
+    {
+      title: 'Motivo',
+      render: (_, r) => r.purpose?.name || '-', // ⬅️ CAMBIO
+    },
+    {
+      title: 'Departamento',
+      render: (_, r) => r.department?.name || '-', // ⬅️ CAMBIO
+    },
     {
       title: 'Entrada',
       dataIndex: 'checkInTime',
@@ -298,10 +306,6 @@ const EntryList = () => {
       ),
     },
   ];
-
-  // ========================
-  // RENDER
-  // ========================
 
   return (
     <div className="space-y-4">
@@ -345,6 +349,40 @@ const EntryList = () => {
           </Col>
 
           <Col span={6}>
+            <Select
+              placeholder="Departamento"
+              allowClear
+              style={{ width: '100%' }}
+              value={filters.department_id}
+              onChange={(v) => handleFilterChange('department_id', v)}
+            >
+              {departments.map((dept) => (
+                <Option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </Option>
+              ))}
+            </Select>
+          </Col>
+
+          <Col span={6}>
+            <Select
+              placeholder="Motivo de visita"
+              allowClear
+              style={{ width: '100%' }}
+              value={filters.purpose_id}
+              onChange={(v) => handleFilterChange('purpose_id', v)}
+            >
+              {purposes.map((purpose) => (
+                <Option key={purpose.id} value={purpose.id}>
+                  {purpose.name}
+                </Option>
+              ))}
+            </Select>
+          </Col>
+        </Row>
+
+        <Row gutter={16} className="mt-4">
+          <Col span={12}>
             <RangePicker
               style={{ width: '100%' }}
               value={filters.dateRange}
@@ -391,7 +429,7 @@ const EntryList = () => {
             showTotal: (t) => `Total: ${t}`,
           }}
           onChange={(p) => setPagination(p)}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1400 }}
         />
       </Card>
     </div>

@@ -363,104 +363,202 @@ export const exportDashboardToExcel = async (req, res) => {
     }
 
     // ==================== HOJA 4: POR DEPARTAMENTO ====================
-    if (includeDepartments) {
-      const deptSheet = workbook.addWorksheet('Por Departamento');
+    // ==================== HOJA 4: POR DEPARTAMENTO ====================
+if (includeDepartments) {
+  const deptSheet = workbook.addWorksheet('Por Departamento');
 
-      const byDepartment = await Entry.findAll({
-        where: {
-          ...whereClause,
-          hostDepartment: { [Op.ne]: null },
-        },
-        attributes: [
-          'hostDepartment',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        ],
-        group: ['hostDepartment'],
-        order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
-        raw: true,
-      });
+  // ✅ CAMBIO AQUÍ
+  const byDepartment = await Entry.findAll({
+    attributes: [
+      'department_id',
+      [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
+    ],
+    include: [
+      {
+        model: Department,
+        as: 'department',
+        attributes: ['id', 'name'],
+      },
+    ],
+    where: {
+      ...whereClause,
+      department_id: { [Op.ne]: null },
+    },
+    group: ['Entry.department_id', 'department.id', 'department.name'],
+    order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
+    raw: false,
+  });
 
-      // Título
-      deptSheet.mergeCells('A1:D1');
-      deptSheet.getCell('A1').value = 'VISITAS POR DEPARTAMENTO';
-      deptSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      deptSheet.getCell('A1').fill = {
+  // Título
+  deptSheet.mergeCells('A1:D1');
+  deptSheet.getCell('A1').value = 'VISITAS POR DEPARTAMENTO';
+  deptSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  deptSheet.getCell('A1').fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF722ED1' },
+  };
+  deptSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+  deptSheet.getRow(1).height = 25;
+
+  // Encabezados
+  deptSheet.getCell('A3').value = 'Departamento';
+  deptSheet.getCell('B3').value = 'Cantidad';
+  deptSheet.getCell('C3').value = 'Porcentaje';
+  deptSheet.getCell('D3').value = 'Gráfico';
+  deptSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  deptSheet.getRow(3).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF4472C4' },
+  };
+
+  const totalDept = byDepartment.reduce((sum, d) => sum + parseInt(d.getDataValue('count')), 0);
+
+  byDepartment.forEach((entry, index) => {
+    const rowNum = 4 + index;
+    const count = parseInt(entry.getDataValue('count'));
+    const percentage = (count / totalDept) * 100;
+
+    deptSheet.getCell(`A${rowNum}`).value = entry.department?.name || 'Sin departamento';  // ✅ CAMBIO
+    deptSheet.getCell(`B${rowNum}`).value = count;
+    deptSheet.getCell(`C${rowNum}`).value = percentage / 100;
+    deptSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
+
+    // Barra de progreso visual
+    const barLength = Math.round((percentage / 100) * 20);
+    deptSheet.getCell(`D${rowNum}`).value = '█'.repeat(barLength);
+
+    if (index % 2 === 1) {
+      deptSheet.getRow(rowNum).fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FF722ED1' },
+        fgColor: { argb: 'FFF0F0F0' },
       };
-      deptSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-      deptSheet.getRow(1).height = 25;
-
-      // Encabezados
-      deptSheet.getCell('A3').value = 'Departamento';
-      deptSheet.getCell('B3').value = 'Cantidad';
-      deptSheet.getCell('C3').value = 'Porcentaje';
-      deptSheet.getCell('D3').value = 'Gráfico';
-      deptSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      deptSheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
-
-      const totalDept = byDepartment.reduce((sum, d) => sum + parseInt(d.count), 0);
-
-      byDepartment.forEach((dept, index) => {
-        const rowNum = 4 + index;
-        const count = parseInt(dept.count);
-        const percentage = (count / totalDept) * 100;
-
-        deptSheet.getCell(`A${rowNum}`).value = dept.hostDepartment;
-        deptSheet.getCell(`B${rowNum}`).value = count;
-        deptSheet.getCell(`C${rowNum}`).value = percentage / 100;
-        deptSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
-
-        // Barra de progreso visual
-        const barLength = Math.round((percentage / 100) * 20);
-        deptSheet.getCell(`D${rowNum}`).value = '█'.repeat(barLength);
-
-        if (index % 2 === 1) {
-          deptSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
-        }
-      });
-
-      // Total
-      const totalRow = 4 + byDepartment.length;
-      deptSheet.getCell(`A${totalRow}`).value = 'TOTAL';
-      deptSheet.getCell(`A${totalRow}`).font = { bold: true };
-      deptSheet.getCell(`B${totalRow}`).value = totalDept;
-      deptSheet.getCell(`B${totalRow}`).font = { bold: true };
-      deptSheet.getCell(`C${totalRow}`).value = 1;
-      deptSheet.getCell(`C${totalRow}`).numFmt = '0.0%';
-      deptSheet.getCell(`C${totalRow}`).font = { bold: true };
-      deptSheet.getRow(totalRow).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFE699' },
-      };
-
-      // Bordes
-      for (let i = 3; i <= totalRow; i++) {
-        ['A', 'B', 'C', 'D'].forEach(col => {
-          deptSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
-          };
-        });
-      }
-
-      deptSheet.getColumn('A').width = 30;
-      deptSheet.getColumn('B').width = 15;
-      deptSheet.getColumn('C').width = 15;
-      deptSheet.getColumn('D').width = 30;
     }
+  });
+
+  // Total
+  const totalRow = 4 + byDepartment.length;
+  deptSheet.getCell(`A${totalRow}`).value = 'TOTAL';
+  deptSheet.getCell(`A${totalRow}`).font = { bold: true };
+  deptSheet.getCell(`B${totalRow}`).value = totalDept;
+  deptSheet.getCell(`B${totalRow}`).font = { bold: true };
+  deptSheet.getCell(`C${totalRow}`).value = 1;
+  deptSheet.getCell(`C${totalRow}`).numFmt = '0.0%';
+  deptSheet.getCell(`C${totalRow}`).font = { bold: true };
+  deptSheet.getRow(totalRow).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFE699' },
+  };
+
+  // Bordes
+  for (let i = 3; i <= totalRow; i++) {
+    ['A', 'B', 'C', 'D'].forEach(col => {
+      deptSheet.getCell(`${col}${i}`).border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+  }
+
+  deptSheet.getColumn('A').width = 30;
+  deptSheet.getColumn('B').width = 15;
+  deptSheet.getColumn('C').width = 15;
+  deptSheet.getColumn('D').width = 30;
+}
+
+// ==================== HOJA 5: POR MOTIVO ====================
+if (includePurposes) {
+  const purposeSheet = workbook.addWorksheet('Por Motivo');
+
+  // ✅ CAMBIO AQUÍ
+  const byPurpose = await Entry.findAll({
+    attributes: [
+      'purpose_id',
+      [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
+    ],
+    include: [
+      {
+        model: VisitPurpose,
+        as: 'purpose',
+        attributes: ['id', 'name'],
+      },
+    ],
+    where: {
+      ...whereClause,
+      purpose_id: { [Op.ne]: null },
+    },
+    group: ['Entry.purpose_id', 'purpose.id', 'purpose.name'],
+    order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
+    limit: 15,
+    raw: false,
+  });
+
+  // Título
+  purposeSheet.mergeCells('A1:C1');
+  purposeSheet.getCell('A1').value = 'MOTIVOS DE VISITA';
+  purposeSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  purposeSheet.getCell('A1').fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFA8C16' },
+  };
+  purposeSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+  purposeSheet.getRow(1).height = 25;
+
+  // Encabezados
+  purposeSheet.getCell('A3').value = 'Motivo';
+  purposeSheet.getCell('B3').value = 'Cantidad';
+  purposeSheet.getCell('C3').value = 'Porcentaje';
+  purposeSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  purposeSheet.getRow(3).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF4472C4' },
+  };
+
+  const totalPurpose = byPurpose.reduce((sum, p) => sum + parseInt(p.getDataValue('count')), 0);
+
+  byPurpose.forEach((entry, index) => {
+    const rowNum = 4 + index;
+    const count = parseInt(entry.getDataValue('count'));
+    const percentage = (count / totalPurpose) * 100;
+
+    purposeSheet.getCell(`A${rowNum}`).value = entry.purpose?.name || 'Sin motivo';  // ✅ CAMBIO
+    purposeSheet.getCell(`B${rowNum}`).value = count;
+    purposeSheet.getCell(`C${rowNum}`).value = percentage / 100;
+    purposeSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
+
+    if (index % 2 === 1) {
+      purposeSheet.getRow(rowNum).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF0F0F0' },
+      };
+    }
+  });
+
+  // Bordes
+  const lastRow = 3 + byPurpose.length;
+  for (let i = 3; i <= lastRow; i++) {
+    ['A', 'B', 'C'].forEach(col => {
+      purposeSheet.getCell(`${col}${i}`).border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+  }
+
+  purposeSheet.getColumn('A').width = 40;
+  purposeSheet.getColumn('B').width = 15;
+  purposeSheet.getColumn('C').width = 15;
+}
 
     // ==================== HOJA 5: POR MOTIVO ====================
     if (includePurposes) {

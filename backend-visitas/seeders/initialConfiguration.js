@@ -12,6 +12,8 @@ const MODULES = [
     "entries",
   "roles",
   "dashboard",
+  "department",
+  "visit-purposes",
   
 ];
 

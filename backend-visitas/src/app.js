@@ -11,6 +11,8 @@ import userRoutes from "./routes/userRoute.js";
 import visitorRoutes from "./routes/visitorRoute.js";
 import entryRoutes from "./routes/entryRoute.js";
 import reportRoutes from "./routes/reportRoute.js";
+import departmentRoute from "./routes/departmentRoute.js";
+import visitPurposeRoute from "./routes/visitPurposeRoute.js"
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,14 +47,18 @@ app.use("/api/users", userRoutes);
 app.use("/api/visitors", visitorRoutes);
 app.use("/api/entries", entryRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/departments", departmentRoute);
+app.use("/api/visit-purposes", visitPurposeRoute);
 
 async function syncDatabase() {
   try {
-    await models.Role.sync({ alter: true });
-    await models.Permission.sync({ alter: true });
-    await models.User.sync({ alter: true }); 
+     await models.Role.sync({ alter: true });
+    await models.Department.sync({ alter: true });
+    await models.VisitPurpose.sync({ alter: true });
     await models.Visitor.sync({ alter: true });
-    await models.Entry.sync({ force: true }); 
+    await models.Permission.sync({ alter: true });
+    await models.User.sync({ alter: true });
+    await models.Entry.sync({ alter: true });
     console.log('🟢 Database synced');
   } catch (err) {
     console.error('❌ Database connection error:', err);

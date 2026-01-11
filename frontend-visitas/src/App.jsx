@@ -11,29 +11,26 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
 import Layout from './components/Layout';
 
-// Dashboard con reportes y gráficas
 import Dashboard from './pages/Dashboard';
 
-// Visitors
 import VisitorsList from './pages/Visitors/VisitorsList';
 import NewVisitor from './pages/Visitors/NewVisitor';
 import EditVisitor from './pages/Visitors/EditVisitor';
 
-// Entries
 import EntriesList from './pages/Entries/EntriesList';
 import EntryNew from './pages/Entries/EntryNew';
 import EntryDetail from './pages/Entries/EntryDetail';
 import EntryEdit from './pages/Entries/EntryEdit';
 
-// Users
 import UsersList from './pages/Users/UsersList';
 import NewUser from './pages/Users/NewUser';
 import EditUser from './pages/Users/EditUser';
 
-// Roles
 import RolesList from './pages/Roles/RolesList';
 import NewRole from './pages/Roles/NewRole';
 import EditRole from './pages/Roles/EditRole';
+import DepartmentList from './pages/Department/DepartmentList.jsx';
+import VisitPurposeList from './pages/VisitPurposeList/VisitPurposeList.jsx';
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
@@ -197,6 +194,28 @@ function AppRoutes() {
             <ProtectedRoute>
               <Layout>
                 <EditRole />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+         <Route 
+          path="/department" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DepartmentList />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+         <Route 
+          path="/visit-purposes" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <VisitPurposeList />
               </Layout>
             </ProtectedRoute>
           } 

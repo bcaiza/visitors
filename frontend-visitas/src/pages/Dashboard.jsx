@@ -52,10 +52,10 @@ const Dashboard = () => {
   const { isDark } = useTheme();
 
   // -------------------- STATE --------------------
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // ✅ CAMBIO: false inicialmente
   const [exporting, setExporting] = useState(false);
 
-  // ✅ FECHAS POR DEFECTO
+  // ✅ FECHAS POR DEFECTO: Últimos 30 días
   const [dateRange, setDateRange] = useState([
     dayjs().subtract(30, 'day'),
     dayjs(),
@@ -81,25 +81,34 @@ const Dashboard = () => {
   const [monthlyData, setMonthlyData] = useState([]);
 
   // -------------------- EFFECT --------------------
-  // ✅ CARGA AUTOMÁTICA AL MONTAR
+  // ✅ CARGA AUTOMÁTICA AL MONTAR EL COMPONENTE
   useEffect(() => {
     loadDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Solo se ejecuta una vez al montar
 
   // -------------------- FUNCTIONS --------------------
-  // ✅ ACEPTA FECHAS PERSONALIZADAS
-  const loadDashboardData = async (customRange = dateRange) => {
-    if (!customRange || !customRange[0] || !customRange[1]) return;
+  const loadDashboardData = async (customRange = null) => {
+    // ✅ Usar customRange si se proporciona, sino usar dateRange del estado
+    const range = customRange || dateRange;
+    
+    if (!range || !range[0] || !range[1]) {
+      message.warning('Selecciona un rango de fechas válido');
+      return;
+    }
 
     setLoading(true);
     try {
       const params = {
-        startDate: customRange[0].format('YYYY-MM-DD'),
-        endDate: customRange[1].format('YYYY-MM-DD'),
+        startDate: range[0].format('YYYY-MM-DD'),
+        endDate: range[1].format('YYYY-MM-DD'),
       };
 
+      console.log('🔍 Cargando dashboard con parámetros:', params); // ✅ Para debug
+
       const data = await reportService.getAllDashboardData(params);
+
+      console.log('✅ Datos recibidos:', data); // ✅ Para debug
 
       setOverview(data.overview);
       setEntriesByDay(data.entriesByDay?.data || []);
@@ -108,8 +117,10 @@ const Dashboard = () => {
       setByPurpose(data.byPurpose?.purposes || []);
       setPeakHours(data.peakHours?.hours || []);
       setMonthlyData(data.monthlyComparison?.months || []);
+
+      message.success('Datos cargados exitosamente');
     } catch (error) {
-      console.error('Error al cargar datos del dashboard:', error);
+      console.error('❌ Error al cargar datos del dashboard:', error);
       message.error('Error al cargar datos del dashboard');
     } finally {
       setLoading(false);
@@ -117,7 +128,10 @@ const Dashboard = () => {
   };
 
   const handleExport = async (type, format) => {
-    if (!dateRange || !dateRange[0] || !dateRange[1]) return;
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      message.warning('Selecciona un rango de fechas válido');
+      return;
+    }
 
     setExporting(true);
     try {
@@ -128,30 +142,41 @@ const Dashboard = () => {
       await reportService.export(type, format, params);
       message.success('Reporte exportado exitosamente');
     } catch (error) {
-      message.error('Error al exportar reporte' + error.message);
+      message.error('Error al exportar reporte: ' + error.message);
     } finally {
       setExporting(false);
     }
   };
 
   const handleExportDashboard = async () => {
-    if (!dateRange || !dateRange[0] || !dateRange[1]) return;
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      message.warning('Selecciona un rango de fechas válido');
+      return;
+    }
 
     setExporting(true);
     try {
       const params = {
         startDate: dateRange[0].format('YYYY-MM-DD'),
-  endDate: dateRange[1].add(1, 'day').format('YYYY-MM-DD'),
+        endDate: dateRange[1].format('YYYY-MM-DD'),
         ...exportOptions,
       };
       await reportService.exportDashboardToExcel(params);
       message.success('Dashboard exportado exitosamente');
       setExportModalVisible(false);
     } catch (error) {
-      message.error('Error al exportar dashboard' + error.message);
+      message.error('Error al exportar dashboard: ' + error.message);
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleDateRangeChange = (dates) => {
+    if (!dates || !dates[0] || !dates[1]) {
+      return;
+    }
+    setDateRange(dates);
+    loadDashboardData(dates); // ✅ Cargar inmediatamente con las nuevas fechas
   };
 
   // -------------------- MENU EXPORT --------------------
@@ -196,11 +221,22 @@ const Dashboard = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
 
   // -------------------- LOADING --------------------
-  if (loading) {
+  if (loading && !overview) { // ✅ Solo mostrar loading si es la primera carga
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '400px',
+          gap: 16,
+        }}
+      >
         <Spin size="large" />
-        <div style={{ marginLeft: 16 }}>Cargando estadísticas...</div>
+        <div className="text-slate-600 dark:text-slate-400">
+          Cargando estadísticas del dashboard...
+        </div>
       </div>
     );
   }
@@ -211,22 +247,28 @@ const Dashboard = () => {
       <Card>
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Dashboard Analítico</h1>
-            <p className="text-slate-500">Estadísticas y reportes de visitantes</p>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+              Dashboard Analítico
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400">
+              Estadísticas y reportes de visitantes
+            </p>
           </div>
 
           <Space>
             <RangePicker
               value={dateRange}
               format="DD/MM/YYYY"
-              onChange={(dates) => {
-                if (!dates) return;
-                setDateRange(dates);
-                loadDashboardData(dates);
-              }}
+              onChange={handleDateRangeChange}
+              allowClear={false}
+              placeholder={['Fecha inicio', 'Fecha fin']}
             />
 
-            <Button icon={<ReloadOutlined />} onClick={() => loadDashboardData()}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => loadDashboardData()}
+              loading={loading}
+            >
               Actualizar
             </Button>
 
@@ -239,7 +281,7 @@ const Dashboard = () => {
         </div>
       </Card>
 
-        {/* Estadísticas principales */}
+      {/* Estadísticas principales */}
       {overview && (
         <Row gutter={16}>
           <Col xs={24} sm={12} lg={6}>
@@ -248,7 +290,7 @@ const Dashboard = () => {
                 title="Total Visitantes"
                 value={overview.totals.visitors}
                 prefix={<TeamOutlined />}
-                styles={{ content: { color: '#1890ff' } }}
+                valueStyle={{ color: '#1890ff' }}
               />
             </Card>
           </Col>
@@ -258,7 +300,7 @@ const Dashboard = () => {
                 title="Total Entradas"
                 value={overview.totals.entries}
                 prefix={<LoginOutlined />}
-                styles={{ content: { color: '#52c41a' } }}
+                valueStyle={{ color: '#52c41a' }}
               />
             </Card>
           </Col>
@@ -268,7 +310,7 @@ const Dashboard = () => {
                 title="Visitantes Activos"
                 value={overview.totals.active}
                 prefix={<ClockCircleOutlined />}
-                styles={{ content: { color: '#faad14' } }}
+                valueStyle={{ color: '#faad14' }}
               />
             </Card>
           </Col>
@@ -278,7 +320,7 @@ const Dashboard = () => {
                 title="Tiempo Promedio"
                 value={overview.metrics.averageStayFormatted}
                 prefix={<ClockCircleOutlined />}
-                styles={{ content: { color: '#722ed1' } }}
+                valueStyle={{ color: '#722ed1' }}
               />
             </Card>
           </Col>
@@ -286,200 +328,212 @@ const Dashboard = () => {
       )}
 
       {/* Gráfica de entradas por día */}
-      <Card title={<><LineChartOutlined className="mr-2" />Entradas por Día</>}>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={entriesByDay}>
-            <defs>
-              <linearGradient id="colorEntries" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#1890ff" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#1890ff" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(date) => dayjs(date).format('DD/MM')}
-            />
-            <YAxis />
-            <Tooltip
-              labelFormatter={(date) => dayjs(date).format('DD/MM/YYYY')}
-              contentStyle={{
-                backgroundColor: isDark ? '#1e293b' : '#fff',
-                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="count"
-              stroke="#1890ff"
-              fillOpacity={1}
-              fill="url(#colorEntries)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Card>
+      {entriesByDay.length > 0 && (
+        <Card title={<><LineChartOutlined className="mr-2" />Entradas por Día</>}>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={entriesByDay}>
+              <defs>
+                <linearGradient id="colorEntries" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#1890ff" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#1890ff" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(date) => dayjs(date).format('DD/MM')}
+              />
+              <YAxis />
+              <Tooltip
+                labelFormatter={(date) => dayjs(date).format('DD/MM/YYYY')}
+                contentStyle={{
+                  backgroundColor: isDark ? '#1e293b' : '#fff',
+                  border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="count"
+                stroke="#1890ff"
+                fillOpacity={1}
+                fill="url(#colorEntries)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
 
       <Row gutter={16}>
         {/* Horas Pico */}
-        <Col xs={24} lg={12}>
-          <Card title={<><BarChartOutlined className="mr-2" />Horas Pico de Entrada</>}>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={peakHours}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="hour"
-                  tickFormatter={(hour) => `${hour}:00`}
-                />
-                <YAxis />
-                <Tooltip
-                  labelFormatter={(hour) => `${hour}:00 - ${hour + 1}:00`}
-                  contentStyle={{
-                    backgroundColor: isDark ? '#1e293b' : '#fff',
-                    border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                  }}
-                />
-                <Bar dataKey="count" fill="#52c41a" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
+        {peakHours.length > 0 && (
+          <Col xs={24} lg={12}>
+            <Card title={<><BarChartOutlined className="mr-2" />Horas Pico de Entrada</>}>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={peakHours}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="hour"
+                    tickFormatter={(hour) => `${hour}:00`}
+                  />
+                  <YAxis />
+                  <Tooltip
+                    labelFormatter={(hour) => `${hour}:00 - ${hour + 1}:00`}
+                    contentStyle={{
+                      backgroundColor: isDark ? '#1e293b' : '#fff',
+                      border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#52c41a" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        )}
 
         {/* Departamentos */}
-        <Col xs={24} lg={12}>
-          <Card title={<><PieChartOutlined className="mr-2" />Visitas por Departamento</>}>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={byDepartment}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ department, percent }) =>
-                    `${department}: ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="count"
-                  nameKey="department"
-                >
-                  {byDepartment.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: isDark ? '#1e293b' : '#fff',
-                    border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
+        {byDepartment.length > 0 && (
+          <Col xs={24} lg={12}>
+            <Card title={<><PieChartOutlined className="mr-2" />Visitas por Departamento</>}>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={byDepartment}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ department, percent }) =>
+                      `${department}: ${(percent * 100).toFixed(0)}%`
+                    }
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                    nameKey="department"
+                  >
+                    {byDepartment.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: isDark ? '#1e293b' : '#fff',
+                      border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        )}
       </Row>
 
       <Row gutter={16}>
         {/* Top Visitantes */}
-        <Col xs={24} lg={12}>
-          <Card title={<><TeamOutlined className="mr-2" />Visitantes Frecuentes</>}>
-            <div className="space-y-3">
-              {topVisitors.map((item, index) => (
-                <div
-                  key={item.visitor.id}
-                  className="flex items-center justify-between p-3 rounded-lg"
-                  style={{
-                    background: isDark ? '#1e293b' : '#f8fafc',
-                    border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="flex items-center justify-center w-8 h-8 rounded-full font-bold"
-                      style={{
-                        background: COLORS[index % COLORS.length],
-                        color: '#fff',
-                      }}
-                    >
-                      {index + 1}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-100">
-                        {item.visitor.firstName} {item.visitor.lastName}
+        {topVisitors.length > 0 && (
+          <Col xs={24} lg={12}>
+            <Card title={<><TeamOutlined className="mr-2" />Visitantes Frecuentes</>}>
+              <div className="space-y-3">
+                {topVisitors.map((item, index) => (
+                  <div
+                    key={item.visitor.id}
+                    className="flex items-center justify-between p-3 rounded-lg"
+                    style={{
+                      background: isDark ? '#1e293b' : '#f8fafc',
+                      border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex items-center justify-center w-8 h-8 rounded-full font-bold"
+                        style={{
+                          background: COLORS[index % COLORS.length],
+                          color: '#fff',
+                        }}
+                      >
+                        {index + 1}
                       </div>
-                      {item.visitor.company && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          {item.visitor.company}
+                      <div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">
+                          {item.visitor.firstName} {item.visitor.lastName}
                         </div>
-                      )}
+                        {item.visitor.company && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {item.visitor.company}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-slate-700 dark:text-slate-200">
+                        {item.visitCount}
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        visitas
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-slate-700 dark:text-slate-200">
-                      {item.visitCount}
-                    </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">
-                      visitas
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Col>
+                ))}
+              </div>
+            </Card>
+          </Col>
+        )}
 
         {/* Motivos */}
-        <Col xs={24} lg={12}>
-          <Card title={<><BarChartOutlined className="mr-2" />Motivos de Visita</>}>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={byPurpose} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="purpose" type="category" width={100} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: isDark ? '#1e293b' : '#fff',
-                    border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                  }}
-                />
-                <Bar dataKey="count" fill="#8884d8">
-                  {byPurpose.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
+        {byPurpose.length > 0 && (
+          <Col xs={24} lg={12}>
+            <Card title={<><BarChartOutlined className="mr-2" />Motivos de Visita</>}>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={byPurpose} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="purpose" type="category" width={100} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: isDark ? '#1e293b' : '#fff',
+                      border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#8884d8">
+                    {byPurpose.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        )}
       </Row>
 
       {/* Comparación Mensual */}
-      <Card title={<><LineChartOutlined className="mr-2" />Tendencia Mensual</>}>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={monthlyData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="month"
-              tickFormatter={(month) => dayjs(month).format('MMM YYYY')}
-            />
-            <YAxis />
-            <Tooltip
-              labelFormatter={(month) => dayjs(month).format('MMMM YYYY')}
-              contentStyle={{
-                backgroundColor: isDark ? '#1e293b' : '#fff',
-                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-              }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="count"
-              stroke="#1890ff"
-              strokeWidth={2}
-              name="Entradas"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
+      {monthlyData.length > 0 && (
+        <Card title={<><LineChartOutlined className="mr-2" />Tendencia Mensual</>}>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="month"
+                tickFormatter={(month) => dayjs(month).format('MMM YYYY')}
+              />
+              <YAxis />
+              <Tooltip
+                labelFormatter={(month) => dayjs(month).format('MMMM YYYY')}
+                contentStyle={{
+                  backgroundColor: isDark ? '#1e293b' : '#fff',
+                  border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                }}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#1890ff"
+                strokeWidth={2}
+                name="Entradas"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
 
       {/* Modal de opciones de exportación */}
       <Modal

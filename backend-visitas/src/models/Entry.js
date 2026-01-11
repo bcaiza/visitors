@@ -18,31 +18,39 @@ const Entry = sequelize.define(
         key: 'id',
       },
     },
-    // Entrada
+    // Cambiar purpose por purpose_id
+    purpose_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'visit_purposes',
+        key: 'id',
+      },
+      comment: 'Motivo de la visita',
+    },
+    // Cambiar hostDepartment por department_id
+    department_id: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: 'departments',
+        key: 'id',
+      },
+    },
+    // El resto de campos igual...
     checkInTime: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    // Salida (inicialmente null)
     checkOutTime: {
       type: DataTypes.DATE,
       allowNull: true,
-    },
-    // Información adicional
-    purpose: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      comment: 'Motivo de la visita',
     },
     hostName: {
       type: DataTypes.STRING,
       allowNull: true,
       comment: 'Persona a quien visita',
-    },
-    hostDepartment: {
-      type: DataTypes.STRING,
-      allowNull: true,
     },
     badge: {
       type: DataTypes.STRING,
@@ -58,13 +66,11 @@ const Entry = sequelize.define(
       allowNull: true,
       comment: 'Temperatura corporal si se requiere',
     },
-    // Estado
     status: {
       type: DataTypes.ENUM('active', 'completed', 'cancelled'),
       defaultValue: 'active',
       comment: 'active = dentro, completed = salió, cancelled = cancelada',
     },
-    // Notas
     entryNotes: {
       type: DataTypes.TEXT,
       allowNull: true,
@@ -75,7 +81,6 @@ const Entry = sequelize.define(
       allowNull: true,
       comment: 'Notas al momento de la salida',
     },
-    // Registro de quién atendió
     checkedInBy: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -92,6 +97,8 @@ const Entry = sequelize.define(
     timestamps: true,
     indexes: [
       { fields: ['visitor_id'] },
+      { fields: ['purpose_id'] },
+      { fields: ['department_id'] },
       { fields: ['status'] },
       { fields: ['checkInTime'] },
       { fields: ['checkOutTime'] },
@@ -104,6 +111,20 @@ Entry.associate = (models) => {
     foreignKey: 'visitor_id',
     as: 'visitor',
     onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+
+  Entry.belongsTo(models.Department, {
+    foreignKey: 'department_id',
+    as: 'department',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+
+  Entry.belongsTo(models.VisitPurpose, {
+    foreignKey: 'purpose_id',
+    as: 'purpose',
+    onDelete: 'SET NULL',
     onUpdate: 'CASCADE',
   });
 };

@@ -30,6 +30,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import entryService from '../../services/entryService';
+import departmentService from '../../services/departmentService';
+import visitPurposeService from '../../services/visitPurposeService';
 import { useTheme } from '../../context/useTheme.jsx';
 
 const { TextArea } = Input;
@@ -43,10 +45,32 @@ const EntryEdit = () => {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [entry, setEntry] = useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [purposes, setPurposes] = useState([]);
 
   useEffect(() => {
+    loadDepartments();
+    loadPurposes();
     loadEntry();
   }, [id]);
+
+  const loadDepartments = async () => {
+    try {
+      const data = await departmentService.getActive();
+      setDepartments(data);
+    } catch (error) {
+      console.error('Error al cargar departamentos:', error);
+    }
+  };
+
+  const loadPurposes = async () => {
+    try {
+      const data = await visitPurposeService.getActive();
+      setPurposes(data);
+    } catch (error) {
+      console.error('Error al cargar motivos:', error);
+    }
+  };
 
   const loadEntry = async () => {
     try {
@@ -56,9 +80,9 @@ const EntryEdit = () => {
 
       // Cargar datos en el formulario
       form.setFieldsValue({
-        purpose: entryData.purpose,
+        purpose_id: entryData.purpose?.id,           // ⬅️ CAMBIO
         hostName: entryData.hostName,
-        hostDepartment: entryData.hostDepartment,
+        department_id: entryData.department?.id,     // ⬅️ CAMBIO
         badge: entryData.badge,
         vehiclePlate: entryData.vehiclePlate,
         temperature: entryData.temperature,
@@ -216,16 +240,23 @@ const EntryEdit = () => {
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Motivo de la Visita"
-                  name="purpose"
+                  name="purpose_id" // ⬅️ CAMBIO
                   rules={[
-                    { required: true, message: 'Ingrese el motivo de la visita' },
+                    { required: true, message: 'Seleccione el motivo de la visita' },
                   ]}
                 >
-                  <Input
-                    prefix={<FileTextOutlined />}
-                    placeholder="Ej: Reunión, Entrega, Mantenimiento"
+                  <Select
+                    placeholder="Seleccione un motivo"
                     size="large"
-                  />
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {purposes.map((purpose) => (
+                      <Option key={purpose.id} value={purpose.id}>
+                        {purpose.name}
+                      </Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
 
@@ -246,16 +277,18 @@ const EntryEdit = () => {
               </Col>
 
               <Col xs={24} md={12}>
-                <Form.Item label="Departamento" name="hostDepartment">
-                  <Select placeholder="Seleccione el departamento" size="large">
-                    <Option value="Administración">Administración</Option>
-                    <Option value="Sistemas">Sistemas</Option>
-                    <Option value="Recursos Humanos">Recursos Humanos</Option>
-                    <Option value="Ventas">Ventas</Option>
-                    <Option value="Operaciones">Operaciones</Option>
-                    <Option value="Mantenimiento">Mantenimiento</Option>
-                    <Option value="Seguridad">Seguridad</Option>
-                    <Option value="Otro">Otro</Option>
+                <Form.Item label="Departamento" name="department_id"> {/* ⬅️ CAMBIO */}
+                  <Select
+                    placeholder="Seleccione el departamento"
+                    size="large"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {departments.map((dept) => (
+                      <Option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>

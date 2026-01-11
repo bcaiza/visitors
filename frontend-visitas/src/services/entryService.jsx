@@ -11,15 +11,15 @@ const entryService = {
    * POST /entries
    * @param {Object} entryData - Datos de la entrada
    * @param {string} entryData.visitor_id - ID del visitante (requerido)
-   * @param {string} entryData.purpose - Motivo de la visita
+   * @param {string} entryData.purpose_id - ID del motivo de visita (UUID) ⬅️ CAMBIO
    * @param {string} entryData.hostName - Persona a quien visita
-   * @param {string} entryData.hostDepartment - Departamento del anfitrión
+   * @param {string} entryData.department_id - ID del departamento (UUID) ⬅️ CAMBIO
    * @param {string} entryData.badge - Número de gafete asignado
    * @param {string} entryData.vehiclePlate - Placa del vehículo
    * @param {number} entryData.temperature - Temperatura corporal
    * @param {string} entryData.entryNotes - Notas de entrada
    * @param {string} entryData.checkedInBy - Usuario que registra
-   * @returns {Promise<Object>} Entrada creada con información del visitante
+   * @returns {Promise<Object>} Entrada creada con información del visitante, departamento y motivo
    */
   checkIn: async (entryData) => {
     try {
@@ -62,7 +62,8 @@ const entryService = {
    * @param {string} params.startDate - Fecha inicio del rango
    * @param {string} params.endDate - Fecha fin del rango
    * @param {string} params.hostName - Filtrar por nombre del anfitrión
-   * @param {string} params.hostDepartment - Filtrar por departamento
+   * @param {string} params.department_id - Filtrar por ID de departamento (UUID) ⬅️ CAMBIO
+   * @param {string} params.purpose_id - Filtrar por ID de motivo de visita (UUID) ⬅️ CAMBIO
    * @param {string} params.badge - Filtrar por gafete
    * @param {string} params.search - Búsqueda global en datos del visitante
    * @param {string} params.sortBy - Campo para ordenar (default: checkInTime)
@@ -124,7 +125,7 @@ const entryService = {
    * Obtener una entrada específica por ID
    * GET /entries/:id
    * @param {string} id - ID de la entrada
-   * @returns {Promise<Object>} Entrada con información del visitante
+   * @returns {Promise<Object>} Entrada con información del visitante, departamento y motivo
    */
   getById: async (id) => {
     try {
@@ -209,9 +210,9 @@ const entryService = {
    * PATCH /entries/:id
    * @param {string} id - ID de la entrada
    * @param {Object} data - Datos a actualizar
-   * @param {string} data.purpose - Motivo de la visita
+   * @param {string} data.purpose_id - ID del motivo de visita (UUID) ⬅️ CAMBIO
    * @param {string} data.hostName - Persona a quien visita
-   * @param {string} data.hostDepartment - Departamento del anfitrión
+   * @param {string} data.department_id - ID del departamento (UUID) ⬅️ CAMBIO
    * @param {string} data.badge - Número de gafete
    * @param {string} data.vehiclePlate - Placa del vehículo
    * @param {number} data.temperature - Temperatura

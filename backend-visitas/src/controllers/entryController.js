@@ -1,16 +1,17 @@
 import { Op } from 'sequelize';
 import Entry from '../models/Entry.js';
 import Visitor from '../models/Visitor.js';
-import e from 'express';
+import Department from '../models/Department.js';
+import VisitPurpose from '../models/VisitPurpose.js';
 
 // POST /entries - Registrar entrada (check-in)
 export const checkIn = async (req, res) => {
   try {
     const {
       visitor_id,
-      purpose,
+      purpose_id,        // ⬅️ Cambio
       hostName,
-      hostDepartment,
+      department_id,     // ⬅️ Cambio
       badge,
       vehiclePlate,
       temperature,
@@ -48,9 +49,9 @@ export const checkIn = async (req, res) => {
 
     const entry = await Entry.create({
       visitor_id,
-      purpose,
+      purpose_id,        // ⬅️ Cambio
       hostName,
-      hostDepartment,
+      department_id,     // ⬅️ Cambio
       badge,
       vehiclePlate,
       temperature,
@@ -62,11 +63,23 @@ export const checkIn = async (req, res) => {
 
     // Obtener la entrada con la información del visitante
     const entryWithVisitor = await Entry.findByPk(entry.id, {
-      include: [{
-        model: Visitor,
-        as: 'visitor',
-        attributes: ['id', 'firstName', 'lastName', 'idNumber', 'company', 'photoPath']
-      }]
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor',
+          attributes: ['id', 'firstName', 'lastName', 'idNumber', 'company', 'photoPath']
+        },
+        {
+          model: Department,
+          as: 'department',
+          attributes: ['id', 'name', 'description']
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose',
+          attributes: ['id', 'name', 'description']
+        }
+      ]
     });
 
     res.status(201).json(entryWithVisitor);
@@ -85,10 +98,20 @@ export const checkOut = async (req, res) => {
     const { exitNotes, checkedOutBy } = req.body;
 
     const entry = await Entry.findByPk(id, {
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }]
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ]
     });
 
     if (!entry) {
@@ -109,10 +132,20 @@ export const checkOut = async (req, res) => {
     });
 
     const updatedEntry = await Entry.findByPk(id, {
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }]
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ]
     });
 
     res.json({
@@ -139,7 +172,8 @@ export const getAllEntries = async (req, res) => {
       startDate,
       endDate,
       hostName,
-      hostDepartment,
+      department_id,      // ⬅️ Cambio
+      purpose_id,         // ⬅️ Cambio
       badge,
       search,
       sortBy = 'checkInTime',
@@ -164,15 +198,20 @@ export const getAllEntries = async (req, res) => {
       whereClause.hostName = { [Op.iLike]: `%${hostName}%` };
     }
 
-    if (hostDepartment) {
-      whereClause.hostDepartment = { [Op.iLike]: `%${hostDepartment}%` };
+    // Filtro por departamento
+    if (department_id) {
+      whereClause.department_id = department_id;
+    }
+
+    // Filtro por motivo
+    if (purpose_id) {
+      whereClause.purpose_id = purpose_id;
     }
 
     // Filtro por gafete
     if (badge) {
       whereClause.badge = { [Op.iLike]: `%${badge}%` };
     }
-
 
     // Filtro por fecha específica
     if (date) {
@@ -202,26 +241,36 @@ export const getAllEntries = async (req, res) => {
     }
 
     // Búsqueda global
-    const includeClause = {
-      model: Visitor,
-      as: 'visitor',
-      attributes: ['id', 'firstName', 'lastName', 'idNumber', 'company', 'photoPath']
-    };
-
-    if (search) {
-      includeClause.where = {
-        [Op.or]: [
-          { firstName: { [Op.iLike]: `%${search}%` } },
-          { lastName: { [Op.iLike]: `%${search}%` } },
-          { idNumber: { [Op.iLike]: `%${search}%` } },
-          { company: { [Op.iLike]: `%${search}%` } }
-        ]
-      };
-    }
+    const includeClause = [
+      {
+        model: Visitor,
+        as: 'visitor',
+        attributes: ['id', 'firstName', 'lastName', 'idNumber', 'company', 'photoPath'],
+        where: search ? {
+          [Op.or]: [
+            { firstName: { [Op.iLike]: `%${search}%` } },
+            { lastName: { [Op.iLike]: `%${search}%` } },
+            { idNumber: { [Op.iLike]: `%${search}%` } },
+            { company: { [Op.iLike]: `%${search}%` } }
+          ]
+        } : undefined,
+        required: search ? true : false
+      },
+      {
+        model: Department,
+        as: 'department',
+        attributes: ['id', 'name', 'description']
+      },
+      {
+        model: VisitPurpose,
+        as: 'purpose',
+        attributes: ['id', 'name', 'description']
+      }
+    ];
 
     const { count, rows } = await Entry.findAndCountAll({
       where: whereClause,
-      include: [includeClause],
+      include: includeClause,
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [[sortBy, sortOrder]],
@@ -238,7 +287,7 @@ export const getAllEntries = async (req, res) => {
       }
     });
   } catch (error) {
-    console.log("Error ", error)
+    console.log("Error ", error);
     res.status(500).json({
       message: 'Error al obtener las entradas',
       error: error.message
@@ -260,10 +309,20 @@ export const getActiveVisitors = async (req, res) => {
 
     const { count, rows } = await Entry.findAndCountAll({
       where: { status: 'active' },
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }],
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [[sortBy, sortOrder]],
@@ -293,10 +352,20 @@ export const getEntryById = async (req, res) => {
     const { id } = req.params;
 
     const entry = await Entry.findByPk(id, {
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }]
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ]
     });
 
     if (!entry) {
@@ -338,10 +407,20 @@ export const cancelEntry = async (req, res) => {
     });
 
     const updatedEntry = await Entry.findByPk(id, {
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }]
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ]
     });
 
     res.json({
@@ -377,10 +456,20 @@ export const getVisitorEntries = async (req, res) => {
 
     const { count, rows } = await Entry.findAndCountAll({
       where: whereClause,
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }],
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [[sortBy, sortOrder]],
@@ -492,10 +581,20 @@ export const getTodayEntries = async (req, res) => {
 
     const { count, rows } = await Entry.findAndCountAll({
       where: whereClause,
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }],
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [[sortBy, sortOrder]],
@@ -524,9 +623,9 @@ export const updateEntry = async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      purpose,
+      purpose_id,        // ⬅️ Cambio
       hostName,
-      hostDepartment,
+      department_id,     // ⬅️ Cambio
       badge,
       vehiclePlate,
       temperature,
@@ -541,9 +640,9 @@ export const updateEntry = async (req, res) => {
     }
 
     const updateData = {};
-    if (purpose !== undefined) updateData.purpose = purpose;
+    if (purpose_id !== undefined) updateData.purpose_id = purpose_id;
     if (hostName !== undefined) updateData.hostName = hostName;
-    if (hostDepartment !== undefined) updateData.hostDepartment = hostDepartment;
+    if (department_id !== undefined) updateData.department_id = department_id;
     if (badge !== undefined) updateData.badge = badge;
     if (vehiclePlate !== undefined) updateData.vehiclePlate = vehiclePlate;
     if (temperature !== undefined) updateData.temperature = temperature;
@@ -553,10 +652,20 @@ export const updateEntry = async (req, res) => {
     await entry.update(updateData);
 
     const updatedEntry = await Entry.findByPk(id, {
-      include: [{
-        model: Visitor,
-        as: 'visitor'
-      }]
+      include: [
+        {
+          model: Visitor,
+          as: 'visitor'
+        },
+        {
+          model: Department,
+          as: 'department'
+        },
+        {
+          model: VisitPurpose,
+          as: 'purpose'
+        }
+      ]
     });
 
     res.json({

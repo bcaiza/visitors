@@ -72,10 +72,10 @@ const EntryDetail = () => {
       onOk: async () => {
         try {
           await entryService.checkOut(entry.id, {
-            checkedOutBy: 'Admin', // Cambiar por usuario actual
+            checkedOutBy: 'Admin',
           });
           message.success('Salida registrada exitosamente');
-          loadEntry(); // Recargar datos
+          loadEntry();
         } catch (error) {
           message.error('Error al registrar la salida');
           console.error(error);
@@ -95,10 +95,10 @@ const EntryDetail = () => {
         try {
           await entryService.cancel(entry.id, {
             cancelReason: 'Cancelado manualmente',
-            cancelledBy: 'Admin', // Cambiar por usuario actual
+            cancelledBy: 'Admin',
           });
           message.success('Entrada cancelada');
-          loadEntry(); // Recargar datos
+          loadEntry();
         } catch (error) {
           message.error('Error al cancelar la entrada');
           console.error(error);
@@ -362,8 +362,15 @@ const EntryDetail = () => {
               }
               span={2}
             >
-              {entry.purpose || '-'}
+              {entry.purpose?.name || '-'} {/* ⬅️ CAMBIO */}
             </Descriptions.Item>
+            {entry.purpose?.description && (
+              <Descriptions.Item label="Descripción del motivo" span={2}>
+                <span className="text-slate-600 dark:text-slate-400">
+                  {entry.purpose.description}
+                </span>
+              </Descriptions.Item>
+            )}
             <Descriptions.Item
               label={
                 <span>
@@ -382,7 +389,7 @@ const EntryDetail = () => {
                 </span>
               }
             >
-              {entry.hostDepartment || '-'}
+              {entry.department?.name || '-'} {/* ⬅️ CAMBIO */}
             </Descriptions.Item>
             <Descriptions.Item
               label={

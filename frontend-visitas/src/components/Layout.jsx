@@ -14,6 +14,9 @@ import {
   Moon,
   ChevronLeft,
   ChevronRight,
+  Building2,
+  FileText,
+  LogIn,
 } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import { useTheme } from '../context/useTheme.jsx';
@@ -41,9 +44,28 @@ const LayoutComponent = ({ children }) => {
     },
     {
       key: "/entries",
-      icon: <ClipboardList size={20} />,
+      icon: <LogIn size={20} />,
       label: <Link to="/entries">Entradas/Salidas</Link>,
       module: "entries",
+    },
+    {
+      key: "configuration",
+      icon: <BarChart3 size={20} />,
+      label: "Configuración",
+      children: [
+        {
+          key: "/department",
+          icon: <Building2 size={18} />,
+          label: <Link to="/department">Departamentos</Link>,
+          module: "department",
+        },
+        {
+          key: "/visit-purposes",
+          icon: <FileText size={18} />,
+          label: <Link to="/visit-purposes">Motivos de Visita</Link>,
+          module: "visit-purposes",
+        },
+      ],
     },
     {
       key: "admin",
@@ -97,6 +119,7 @@ const LayoutComponent = ({ children }) => {
     
     // Manejo especial para rutas dinámicas
     if (currentPath.startsWith('/entries/edit/') || 
+        currentPath.startsWith('/entries/new') ||
         currentPath.match(/^\/entries\/[^/]+$/)) {
       return ['/entries'];
     }
@@ -104,11 +127,19 @@ const LayoutComponent = ({ children }) => {
         currentPath === '/visitors/new') {
       return ['/visitors'];
     }
-    if (currentPath.startsWith('/users/edit/')) {
+    if (currentPath.startsWith('/users/edit/') ||
+        currentPath === '/users/new') {
       return ['/users'];
     }
-    if (currentPath.startsWith('/roles/edit/')) {
+    if (currentPath.startsWith('/roles/edit/') ||
+        currentPath === '/roles/new') {
       return ['/roles'];
+    }
+    if (currentPath === '/departments') {
+      return ['/departments'];
+    }
+    if (currentPath === '/visit-purposes') {
+      return ['/visit-purposes'];
     }
     
     // Búsqueda en el menú
@@ -132,6 +163,10 @@ const LayoutComponent = ({ children }) => {
       return ['admin'];
     }
     
+    if (currentPath === '/departments' || currentPath === '/visit-purposes') {
+      return ['configuration'];
+    }
+    
     for (const item of menuItems) {
       if (item.children) {
         const child = item.children.find(c => c.key === currentPath);
@@ -150,9 +185,11 @@ const LayoutComponent = ({ children }) => {
     if (path === '/visitors/new') return 'Nuevo Visitante';
     if (path.startsWith('/visitors/edit/')) return 'Editar Visitante';
     if (path === '/entries') return 'Entradas y Salidas';
-    if (path === '/entries/checkin') return 'Registrar Entrada';
+    if (path === '/entries/new') return 'Registrar Entrada';
     if (path.startsWith('/entries/edit/')) return 'Editar Entrada';
     if (path.match(/^\/entries\/[^/]+$/)) return 'Detalle de Entrada';
+    if (path === '/departments') return 'Departamentos';
+    if (path === '/visit-purposes') return 'Motivos de Visita';
     if (path === '/users') return 'Usuarios';
     if (path === '/users/new') return 'Nuevo Usuario';
     if (path.startsWith('/users/edit/')) return 'Editar Usuario';
@@ -165,28 +202,27 @@ const LayoutComponent = ({ children }) => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-     <Sider
-  collapsible
-  collapsed={collapsed}
-  onCollapse={setCollapsed}
-  width={280}
-  trigger={null}
-  style={{
-    position: 'fixed',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    height: '100vh',
-    overflow: 'auto',
-    background: isDark ? '#0f172a' : '#1e293b',
-    borderRight: isDark ? '1px solid #1e293b' : '1px solid #334155',
-    boxShadow: isDark
-      ? '4px 0 24px rgba(0, 0, 0, 0.4)'
-      : '4px 0 24px rgba(0, 0, 0, 0.08)',
-    zIndex: 100,
-  }}
->
-
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        width={280}
+        trigger={null}
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          height: '100vh',
+          overflow: 'auto',
+          background: isDark ? '#0f172a' : '#1e293b',
+          borderRight: isDark ? '1px solid #1e293b' : '1px solid #334155',
+          boxShadow: isDark
+            ? '4px 0 24px rgba(0, 0, 0, 0.4)'
+            : '4px 0 24px rgba(0, 0, 0, 0.08)',
+          zIndex: 100,
+        }}
+      >
         {/* Logo y Título */}
         <div style={{ 
           padding: collapsed ? '20px 0' : '24px 20px', 
@@ -273,30 +309,28 @@ const LayoutComponent = ({ children }) => {
       </Sider>
 
       <Layout
-  style={{
-    marginLeft: collapsed ? 80 : 280,
-    transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  }}
->
-
+        style={{
+          marginLeft: collapsed ? 80 : 280,
+          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
         <Header
-  style={{
-    position: 'sticky',
-    top: 0,
-    zIndex: 90,
-    padding: '0 32px',
-    background: isDark ? '#0f172a' : '#ffffff',
-    borderBottom: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    boxShadow: isDark
-      ? '0 1px 3px rgba(0, 0, 0, 0.3)'
-      : '0 1px 3px rgba(0, 0, 0, 0.06)',
-    height: 72,
-  }}
->
-
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 90,
+            padding: '0 32px',
+            background: isDark ? '#0f172a' : '#ffffff',
+            borderBottom: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            boxShadow: isDark
+              ? '0 1px 3px rgba(0, 0, 0, 0.3)'
+              : '0 1px 3px rgba(0, 0, 0, 0.06)',
+            height: 72,
+          }}
+        >
           {/* Lado Izquierdo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button
@@ -413,14 +447,13 @@ const LayoutComponent = ({ children }) => {
         </Header>
 
         {/* Contenido */}
-      <Content
-  style={{
-    margin: '24px',
-    overflowY: 'auto',
-    height: 'calc(100vh - 72px)',
-  }}
->
-
+        <Content
+          style={{
+            margin: '24px',
+            overflowY: 'auto',
+            height: 'calc(100vh - 72px)',
+          }}
+        >
           <div style={{
             padding: 24,
             background: isDark ? '#0f172a' : '#ffffff',

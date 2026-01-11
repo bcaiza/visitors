@@ -30,6 +30,8 @@ import {
 } from '@ant-design/icons';
 import visitorService from '../../services/visitorService';
 import entryService from '../../services/entryService';
+import departmentService from '../../services/departmentService';
+import visitPurposeService from '../../services/visitPurposeService';
 import { useTheme } from '../../context/useTheme.jsx';
 
 const { TextArea } = Input;
@@ -41,12 +43,16 @@ const EntryNew = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [visitors, setVisitors] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [purposes, setPurposes] = useState([]);
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [activeEntry, setActiveEntry] = useState(null);
 
   useEffect(() => {
     loadVisitors();
+    loadDepartments();
+    loadPurposes();
   }, []);
 
   const loadVisitors = async () => {
@@ -59,6 +65,26 @@ const EntryNew = () => {
       console.error(error);
     } finally {
       setLoadingVisitors(false);
+    }
+  };
+
+  const loadDepartments = async () => {
+    try {
+      const data = await departmentService.getActive();
+      setDepartments(data);
+    } catch (error) {
+      message.error('Error al cargar departamentos');
+      console.error(error);
+    }
+  };
+
+  const loadPurposes = async () => {
+    try {
+      const data = await visitPurposeService.getActive();
+      setPurposes(data);
+    } catch (error) {
+      message.error('Error al cargar motivos de visita');
+      console.error(error);
     }
   };
 
@@ -89,9 +115,9 @@ const EntryNew = () => {
     try {
       const entryData = {
         visitor_id: values.visitor_id,
-        purpose: values.purpose,
+        purpose_id: values.purpose_id,           // ⬅️ CAMBIO
         hostName: values.hostName,
-        hostDepartment: values.hostDepartment,
+        department_id: values.department_id,     // ⬅️ CAMBIO
         badge: values.badge,
         vehiclePlate: values.vehiclePlate,
         temperature: values.temperature,
@@ -272,14 +298,26 @@ const EntryNew = () => {
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Motivo de la Visita"
-                  name="purpose"
-                  rules={[{ required: true, message: 'Ingrese el motivo de la visita' }]}
+                  name="purpose_id" // ⬅️ CAMBIO
+                  rules={[{ required: true, message: 'Seleccione el motivo de la visita' }]}
                 >
-                  <Input
-                    prefix={<FileTextOutlined />}
-                    placeholder="Ej: Reunión, Entrega, Mantenimiento"
+                  <Select
+                    placeholder="Seleccione un motivo"
                     size="large"
-                  />
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {purposes.map((purpose) => (
+                      <Option key={purpose.id} value={purpose.id}>
+                        <div>
+                          <div>{purpose.name}</div>
+                          {purpose.description && (
+                            <div className="text-xs text-slate-500">{purpose.description}</div>
+                          )}
+                        </div>
+                      </Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
 
@@ -300,17 +338,24 @@ const EntryNew = () => {
               <Col xs={24} md={12}>
                 <Form.Item
                   label="Departamento"
-                  name="hostDepartment"
+                  name="department_id" // ⬅️ CAMBIO
                 >
-                  <Select placeholder="Seleccione el departamento" size="large">
-                    <Option value="Administración">Administración</Option>
-                    <Option value="Sistemas">Sistemas</Option>
-                    <Option value="Recursos Humanos">Recursos Humanos</Option>
-                    <Option value="Ventas">Ventas</Option>
-                    <Option value="Operaciones">Operaciones</Option>
-                    <Option value="Mantenimiento">Mantenimiento</Option>
-                    <Option value="Seguridad">Seguridad</Option>
-                    <Option value="Otro">Otro</Option>
+                  <Select
+                    placeholder="Seleccione el departamento"
+                    size="large"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {departments.map((dept) => (
+                      <Option key={dept.id} value={dept.id}>
+                        <div>
+                          <div>{dept.name}</div>
+                          {dept.description && (
+                            <div className="text-xs text-slate-500">{dept.description}</div>
+                          )}
+                        </div>
+                      </Option>
+                    ))}
                   </Select>
                 </Form.Item>
               </Col>
