@@ -13,44 +13,44 @@ import { authenticate, checkPermission } from '../middleware/permissions.js';
 const router = express.Router();
 
 router.get('/', 
-  //authenticate, 
-  //checkPermission('roles', 'view'),
+  authenticate, 
+  checkPermission('roles', 'view'),
   getRoles
 );
 
 router.get('/:id/permissions', 
-  //authenticate, 
-  //checkPermission('roles', 'view'),
+  authenticate, 
+  checkPermission('roles', 'view'),
   getRolePermissions
 );
 
 router.get('/:id', 
-  //authenticate, 
-  //checkPermission('roles', 'view'),
+  authenticate, 
+  checkPermission('roles', 'view'),
   getRoleById
 );
 
 router.post('/', 
-  //authenticate, 
-  //checkPermission('roles', 'create'),
+  authenticate, 
+  checkPermission('roles', 'create'),
   createRole
 );
 
 router.put('/:id', 
-  //authenticate, 
-  //checkPermission('roles', 'edit'),
+  authenticate, 
+  checkPermission('roles', 'edit'),
   updateRole
 );
 
 router.put('/:id/permissions', 
-  //authenticate, 
-  //checkPermission('roles', 'edit'),
+  authenticate, 
+  checkPermission('roles', 'edit'),
   updateRolePermissions
 );
 
 router.delete('/:id', 
-  //authenticate, 
-  //checkPermission('users', 'delete'),
+  authenticate, 
+  checkPermission('roles', 'delete'),
   deleteRole
 );
 

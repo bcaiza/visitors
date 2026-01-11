@@ -8,15 +8,50 @@ import {
   deleteVisitPurpose,
   toggleVisitPurposeStatus
 } from '../controllers/visitPurposeController.js';
+import { authenticate, checkPermission } from '../middleware/permissions.js';
 
 const router = express.Router();
 
-router.post('/', createVisitPurpose);
-router.get('/', getAllVisitPurposes);
-router.get('/active', getActiveVisitPurposes);
-router.get('/:id', getVisitPurposeById);
-router.put('/:id', updateVisitPurpose);
-router.delete('/:id', deleteVisitPurpose);
-router.patch('/:id/toggle', toggleVisitPurposeStatus);
+router.post('/', 
+  authenticate, 
+  checkPermission('visit-purposes', 'create'),
+  createVisitPurpose
+);
+
+router.get('/', 
+  authenticate, 
+  checkPermission('visit-purposes', 'view'),
+  getAllVisitPurposes
+);
+
+router.get('/active', 
+  authenticate, 
+  checkPermission('visit-purposes', 'view'),
+  getActiveVisitPurposes
+);
+
+router.get('/:id', 
+  authenticate, 
+  checkPermission('visit-purposes', 'view'),
+  getVisitPurposeById
+);
+
+router.put('/:id', 
+  authenticate, 
+  checkPermission('visit-purposes', 'edit'),
+  updateVisitPurpose
+);
+
+router.delete('/:id', 
+  authenticate, 
+  checkPermission('visit-purposes', 'delete'),
+  deleteVisitPurpose
+);
+
+router.patch('/:id/toggle', 
+  authenticate, 
+  checkPermission('visit-purposes', 'edit'),
+  toggleVisitPurposeStatus
+);
 
 export default router;
