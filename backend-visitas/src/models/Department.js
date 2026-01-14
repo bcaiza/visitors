@@ -13,7 +13,6 @@ const Department = sequelize.define(
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,  // ⬅️ Esto es suficiente, Sequelize crea el índice automáticamente
       comment: 'Nombre del departamento',
     },
     description: {

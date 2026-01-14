@@ -13,7 +13,6 @@ const VisitPurpose = sequelize.define(
     name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,  // ⬅️ Esto es suficiente
       comment: 'Nombre del motivo de visita',
     },
     description: {

@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -34,8 +35,6 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password }),
       });
 
-   
-
       if (!response.ok) {
         throw new Error('Credenciales inválidas');
       }
@@ -62,38 +61,40 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('visitors-token');
   };
 
- const hasPermission = (module, action) => {
-  console.log('user', user);
-  console.log('Checking permission for module:', module, 'action:', action);
-  console.log('User role permissions:', user?.role?.permissions);
-
-  if (!user || !user.role || !user.role.permissions) {
-    console.log('No user, role or permissions');
-    return false;
-  }
-
-  const permission = user.role.permissions.find(
-    p => p.module === module
-  );
-
-  console.log('Found permission:', permission);
-
-  if (!permission) return false;
-
-  switch (action) {
-    case 'view':
-      return permission.can_view;
-    case 'create':
-      return permission.can_create;
-    case 'edit':
-      return permission.can_edit;
-    case 'delete':
-      return permission.can_delete;
-    default:
+  const hasPermission = (module, action) => {
+    // Si no hay usuario o rol, no tiene permisos
+    if (!user || !user.role || !user.role.permissions) {
+      console.log('❌ No user, role or permissions');
       return false;
-  }
-};
+    }
 
+    // Buscar el módulo específico
+    const permission = user.role.permissions.find(
+      p => p.module === module
+    );
+
+    console.log(`🔍 Checking ${module}.${action}:`, permission);
+
+    if (!permission) {
+      console.log(`❌ No permission found for module: ${module}`);
+      return false;
+    }
+
+    // Verificar la acción específica
+    switch (action) {
+      case 'view':
+        return permission.can_view === true;
+      case 'create':
+        return permission.can_create === true;
+      case 'edit':
+        return permission.can_edit === true;
+      case 'delete':
+        return permission.can_delete === true;
+      default:
+        console.log(`❌ Unknown action: ${action}`);
+        return false;
+    }
+  };
 
   const value = {
     user,

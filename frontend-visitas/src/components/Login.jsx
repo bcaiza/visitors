@@ -149,16 +149,6 @@ const Login = () => {
             Sistema Integral de Gestión
           </p>
           
-          <Space size={4} style={{ justifyContent: 'center' }}>
-            <ShieldCheck size={16} style={{ color: '#10b981' }} />
-            <span style={{ 
-              fontSize: '13px', 
-              color: '#10b981',
-              fontWeight: 600,
-            }}>
-              Conexión Segura
-            </span>
-          </Space>
         </div>
 
         {/* Alerta de error */}
@@ -309,14 +299,6 @@ const Login = () => {
           textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
         }}>
           Sistema de Control de Visitantes © {new Date().getFullYear()}
-        </p>
-        <p style={{ 
-          fontSize: '12px',
-          color: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.7)',
-          margin: '4px 0 0 0',
-          textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-        }}>
-          Desarrollado con tecnología de vanguardia
         </p>
       </div>
     </div>

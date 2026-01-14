@@ -1,3 +1,4 @@
+import sequelize from '../config/database.js';  
 import User from './User.js';
 import Role from './Role.js';
 import Permission from './Permission.js';
@@ -7,6 +8,7 @@ import Department from './Department.js';
 import VisitPurpose from './VisitPurpose.js'; 
 
 const models = {
+  sequelize,     
   User,
   Role,
   Permission,

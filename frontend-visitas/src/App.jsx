@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, theme as antdTheme } from 'antd';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { ConfigProvider, Spin } from 'antd';
 import esES from 'antd/locale/es_ES';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/useAuth.jsx';
@@ -33,193 +33,85 @@ import DepartmentList from './pages/Department/DepartmentList.jsx';
 import VisitPurposeList from './pages/VisitPurposeList/VisitPurposeList.jsx';
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const { isDark } = useTheme();
+
+  // 🛑 Mostrar spinner mientras verifica autenticación
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+          background: isDark ? '#0f172a' : '#f0f2f5',
+          gap: '16px',
+        }}
+      >
+        <Spin size="large" />
+        <p style={{ 
+          color: isDark ? '#94a3b8' : '#64748b',
+          fontSize: '14px',
+          fontWeight: 500,
+        }}>
+          Cargando...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <ConfigProvider
       locale={esES}
       theme={isDark ? darkTheme : lightTheme}
-      algorithm={isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm}
     >
       <Routes>
-        {/* Login */}
+        {/* Login - Redirige al dashboard si ya está autenticado */}
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
         />
 
-        {/* Dashboard - Reportes y Estadísticas */}
-        <Route 
-          path="/dashboard" 
+        {/* Rutas protegidas con Layout */}
+        <Route
           element={
             <ProtectedRoute>
               <Layout>
-                <Dashboard />
+                <Outlet />
               </Layout>
             </ProtectedRoute>
-          } 
-        />
+          }
+        >
+          {/* Dashboard */}
+          <Route path="/dashboard" element={<Dashboard />} />
 
-        {/* Visitantes */}
-        <Route 
-          path="/visitors" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <VisitorsList />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/visitors/new" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <NewVisitor />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/visitors/edit/:id" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EditVisitor />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
+          {/* Visitantes */}
+          <Route path="/visitors" element={<VisitorsList />} />
+          <Route path="/visitors/new" element={<NewVisitor />} />
+          <Route path="/visitors/edit/:id" element={<EditVisitor />} />
 
-        {/* Entradas y Salidas */}
-        <Route 
-          path="/entries" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EntriesList />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/entries/new" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EntryNew />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/entries/:id" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EntryDetail />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/entries/:id/edit" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EntryEdit />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
+          {/* Entradas y Salidas */}
+          <Route path="/entries" element={<EntriesList />} />
+          <Route path="/entries/new" element={<EntryNew />} />
+          <Route path="/entries/:id" element={<EntryDetail />} />
+          <Route path="/entries/:id/edit" element={<EntryEdit />} />
 
-        {/* Usuarios */}
-        <Route 
-          path="/users" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <UsersList />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/users/new" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <NewUser />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/users/edit/:id" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EditUser />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
+          {/* Usuarios */}
+          <Route path="/users" element={<UsersList />} />
+          <Route path="/users/new" element={<NewUser />} />
+          <Route path="/users/edit/:id" element={<EditUser />} />
 
-        {/* Roles */}
-        <Route 
-          path="/roles" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <RolesList />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/roles/new" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <NewRole />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/roles/edit/:id" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <EditRole />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
+          {/* Roles */}
+          <Route path="/roles" element={<RolesList />} />
+          <Route path="/roles/new" element={<NewRole />} />
+          <Route path="/roles/edit/:id" element={<EditRole />} />
 
-         <Route 
-          path="/department" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <DepartmentList />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-
-         <Route 
-          path="/visit-purposes" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <VisitPurposeList />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
+          {/* Configuración */}
+          <Route path="/department" element={<DepartmentList />} />
+          <Route path="/visit-purposes" element={<VisitPurposeList />} />
+        </Route>
 
         {/* Redirecciones */}
         <Route 
