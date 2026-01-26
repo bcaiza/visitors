@@ -41,16 +41,16 @@ const EditRole = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [roleData, setRoleData] = useState(null);
   
-  // Estado para permisos por módulo
   const [permissions, setPermissions] = useState({
     dashboard: { view: false },
     visitors: { view: false, create: false, edit: false, delete: false },
     entries: { view: false, create: false, edit: false, delete: false },
+    department: { view: false, create: false, edit: false, delete: false },
+    'visit-purpose': { view: false, create: false, edit: false, delete: false },
     users: { view: false, create: false, edit: false, delete: false },
     roles: { view: false, create: false, edit: false, delete: false },
   });
 
-  // Definición de módulos con sus permisos disponibles
   const modules = [
     {
       key: 'dashboard',
@@ -74,19 +74,19 @@ const EditRole = () => {
       icon: '📋'
     },
     {
-  key: 'department',
-  name: 'Departamentos',
-  description: 'Gestión de departamentos',
-  permissions: ['view', 'create', 'edit', 'delete'],
-  icon: '🏢'
-},
-{
-  key: 'visit-purpose',
-  name: 'Propósito de Visita',
-  description: 'Gestión de propósitos de visita',
-  permissions: ['view', 'create', 'edit', 'delete'],
-  icon: '🎯'
-},
+      key: 'department',
+      name: 'Departamentos',
+      description: 'Gestión de departamentos',
+      permissions: ['view', 'create', 'edit', 'delete'],
+      icon: '🏢'
+    },
+    {
+      key: 'visit-purpose',
+      name: 'Propósito de Visita',
+      description: 'Gestión de propósitos de visita',
+      permissions: ['view', 'create', 'edit', 'delete'],
+      icon: '🎯'
+    },
     {
       key: 'users',
       name: 'Usuarios',
@@ -120,7 +120,6 @@ const EditRole = () => {
       const role = await roleService.getRoleById(id);
       setRoleData(role);
 
-      // Setear valores en el formulario
       form.setFieldsValue({
         name: role.name,
         description: role.description || '',
@@ -145,6 +144,8 @@ const EditRole = () => {
           dashboard: { view: false },
           visitors: { view: false, create: false, edit: false, delete: false },
           entries: { view: false, create: false, edit: false, delete: false },
+          department: { view: false, create: false, edit: false, delete: false },
+          'visit-purpose': { view: false, create: false, edit: false, delete: false },
           users: { view: false, create: false, edit: false, delete: false },
           roles: { view: false, create: false, edit: false, delete: false },
         });
@@ -198,7 +199,7 @@ const EditRole = () => {
     const modulePerms = modules.find(m => m.key === module);
     if (!modulePerms) return false;
     
-    return modulePerms.permissions.every(perm => permissions[module][perm]);
+    return modulePerms.permissions.every(perm => permissions[module]?.[perm]);
   };
 
   const getPermissionCount = () => {
@@ -504,7 +505,7 @@ const EditRole = () => {
                           {module.permissions.map(perm => (
                             <Checkbox
                               key={perm}
-                              checked={permissions[module.key][perm]}
+                              checked={permissions[module.key]?.[perm] || false}
                               onChange={(e) => handlePermissionChange(module.key, perm, e.target.checked)}
                               disabled={isSystemRole}
                             >
