@@ -68,8 +68,8 @@ const EntryList = () => {
     search: '',
     status: '',
     dateRange: null,
-    department_id: '', // ⬅️ CAMBIO
-    purpose_id: '',    // ⬅️ NUEVO
+    department_id: '',
+    purpose_id: '',    
   });
 
   const [viewMode, setViewMode] = useState('all');
