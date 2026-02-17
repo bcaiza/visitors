@@ -7,6 +7,19 @@ import Department from '../models/Department.js';
 import VisitPurpose from '../models/VisitPurpose.js';
 import sequelize from '../config/database.js';
 
+// ==================== HELPER DE FECHAS ====================
+
+/**
+ * Convierte un string de fecha a rango completo del día en hora local
+ * startDate -> 2026-02-16T00:00:00.000 (inicio del día)
+ * endDate   -> 2026-02-16T23:59:59.999 (fin del día)
+ */
+const parseDateRange = (startDate, endDate) => {
+  const start = new Date(`${startDate}T00:00:00.000`);
+  const end = new Date(`${endDate}T23:59:59.999`);
+  return { start, end };
+};
+
 // ==================== EXPORTACIÓN A EXCEL ====================
 
 /**
@@ -19,8 +32,9 @@ export const exportVisitorsToExcel = async (req, res) => {
     const whereClause = {};
 
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
@@ -29,11 +43,11 @@ export const exportVisitorsToExcel = async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    // Crear libro de Excel
+    console.log('Visitantes a exportar:', visitors.length);
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Visitantes');
 
-    // Configurar columnas
     worksheet.columns = [
       { header: 'ID', key: 'id', width: 38 },
       { header: 'Nombre', key: 'firstName', width: 20 },
@@ -48,16 +62,13 @@ export const exportVisitorsToExcel = async (req, res) => {
       { header: 'Fecha Registro', key: 'createdAt', width: 20 },
     ];
 
-    // Estilo del encabezado
-    worksheet.getRow(1).font = { bold: true, size: 12 };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FF4472C4' },
     };
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
 
-    // Agregar datos
     visitors.forEach((visitor) => {
       worksheet.addRow({
         id: visitor.id,
@@ -74,8 +85,7 @@ export const exportVisitorsToExcel = async (req, res) => {
       });
     });
 
-    // Aplicar bordes a todas las celdas
-    worksheet.eachRow((row, rowNumber) => {
+    worksheet.eachRow((row) => {
       row.eachCell((cell) => {
         cell.border = {
           top: { style: 'thin' },
@@ -86,7 +96,6 @@ export const exportVisitorsToExcel = async (req, res) => {
       });
     });
 
-    // Configurar respuesta
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -117,14 +126,17 @@ export const exportEntriesToExcel = async (req, res) => {
     const whereClause = {};
 
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.checkInTime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
     if (status) {
       whereClause.status = status;
     }
+
+    console.log('Criterios de filtrado:', whereClause);
 
     const entries = await Entry.findAll({
       where: whereClause,
@@ -133,20 +145,25 @@ export const exportEntriesToExcel = async (req, res) => {
           model: Visitor,
           as: 'visitor',
           attributes: ['firstName', 'lastName', 'idNumber', 'company'],
+          required: false,
         },
         {
           model: Department,
           as: 'department',
           attributes: ['name'],
+          required: false,
         },
         {
           model: VisitPurpose,
           as: 'purpose',
           attributes: ['name'],
+          required: false,
         },
       ],
       order: [['checkInTime', 'DESC']],
     });
+
+    console.log('Entradas a exportar:', entries.length);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Entradas y Salidas');
@@ -170,14 +187,12 @@ export const exportEntriesToExcel = async (req, res) => {
       { header: 'Notas Salida', key: 'exitNotes', width: 40 },
     ];
 
-    // Estilo del encabezado
-    worksheet.getRow(1).font = { bold: true, size: 12 };
     worksheet.getRow(1).fill = {
       type: 'pattern',
       pattern: 'solid',
       fgColor: { argb: 'FF70AD47' },
     };
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
 
     entries.forEach((entry) => {
       let duration = null;
@@ -192,17 +207,19 @@ export const exportEntriesToExcel = async (req, res) => {
         checkOutTime: entry.checkOutTime
           ? new Date(entry.checkOutTime).toLocaleString('es-ES')
           : 'N/A',
-        visitorName: `${entry.visitor.firstName} ${entry.visitor.lastName}`,
-        idNumber: entry.visitor.idNumber,
-        company: entry.visitor.company || 'N/A',
-        purpose: entry.purpose?.name || 'N/A', // ⬅️ CAMBIO
+        visitorName: entry.visitor
+          ? `${entry.visitor.firstName} ${entry.visitor.lastName}`
+          : 'N/A',
+        idNumber: entry.visitor?.idNumber || 'N/A',
+        company: entry.visitor?.company || 'N/A',
+        purpose: entry.purpose?.name || 'N/A',
         hostName: entry.hostName || 'N/A',
-        department: entry.department?.name || 'N/A', // ⬅️ CAMBIO
+        department: entry.department?.name || 'N/A',
         badge: entry.badge || 'N/A',
         vehiclePlate: entry.vehiclePlate || 'N/A',
         temperature: entry.temperature || 'N/A',
         status: entry.status,
-        duration: duration || 'En proceso',
+        duration: duration ?? 'En proceso',
         checkedInBy: entry.checkedInBy || 'N/A',
         entryNotes: entry.entryNotes || 'N/A',
         exitNotes: entry.exitNotes || 'N/A',
@@ -252,8 +269,9 @@ export const exportVisitorsToCSV = async (req, res) => {
     const whereClause = {};
 
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
@@ -299,7 +317,6 @@ export const exportVisitorsToCSV = async (req, res) => {
       `attachment; filename=visitantes_${new Date().toISOString().split('T')[0]}.csv`
     );
 
-    // BOM para UTF-8 (para que Excel abra correctamente)
     res.write('\ufeff');
     res.write(csv);
     res.end();
@@ -322,8 +339,9 @@ export const exportEntriesToCSV = async (req, res) => {
     const whereClause = {};
 
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.checkInTime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
@@ -338,16 +356,19 @@ export const exportEntriesToCSV = async (req, res) => {
           model: Visitor,
           as: 'visitor',
           attributes: ['firstName', 'lastName', 'idNumber', 'company'],
+          required: false,
         },
         {
           model: Department,
           as: 'department',
           attributes: ['name'],
+          required: false,
         },
         {
           model: VisitPurpose,
           as: 'purpose',
           attributes: ['name'],
+          required: false,
         },
       ],
       order: [['checkInTime', 'DESC']],
@@ -385,12 +406,14 @@ export const exportEntriesToCSV = async (req, res) => {
         checkOutTime: entry.checkOutTime
           ? new Date(entry.checkOutTime).toLocaleString('es-ES')
           : '',
-        visitorName: `${entry.visitor.firstName} ${entry.visitor.lastName}`,
-        idNumber: entry.visitor.idNumber,
-        company: entry.visitor.company || '',
-        purpose: entry.purpose?.name || '', // ⬅️ CAMBIO
+        visitorName: entry.visitor
+          ? `${entry.visitor.firstName} ${entry.visitor.lastName}`
+          : '',
+        idNumber: entry.visitor?.idNumber || '',
+        company: entry.visitor?.company || '',
+        purpose: entry.purpose?.name || '',
         hostName: entry.hostName || '',
-        department: entry.department?.name || '', // ⬅️ CAMBIO
+        department: entry.department?.name || '',
         badge: entry.badge || '',
         vehiclePlate: entry.vehiclePlate || '',
         temperature: entry.temperature || '',
@@ -433,11 +456,14 @@ export const getDashboardOverview = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    // Fechas por defecto: último mes
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate
-      ? new Date(startDate)
-      : new Date(new Date().setMonth(end.getMonth() - 1));
+    let start, end;
+    if (startDate && endDate) {
+      ({ start, end } = parseDateRange(startDate, endDate));
+    } else {
+      end = new Date();
+      start = new Date();
+      start.setMonth(end.getMonth() - 1);
+    }
 
     const whereClause = {
       checkInTime: {
@@ -445,7 +471,6 @@ export const getDashboardOverview = async (req, res) => {
       },
     };
 
-    // Totales
     const [
       totalVisitors,
       totalEntries,
@@ -460,7 +485,6 @@ export const getDashboardOverview = async (req, res) => {
       Entry.count({ where: { ...whereClause, status: 'cancelled' } }),
     ]);
 
-    // Tiempo promedio de permanencia
     const completedEntriesWithTime = await Entry.findAll({
       where: {
         ...whereClause,
@@ -485,10 +509,7 @@ export const getDashboardOverview = async (req, res) => {
     }
 
     res.json({
-      period: {
-        startDate: start,
-        endDate: end,
-      },
+      period: { startDate: start, endDate: end },
       totals: {
         visitors: totalVisitors,
         entries: totalEntries,
@@ -518,10 +539,14 @@ export const getEntriesByDay = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate
-      ? new Date(startDate)
-      : new Date(new Date().setDate(end.getDate() - 30));
+    let start, end;
+    if (startDate && endDate) {
+      ({ start, end } = parseDateRange(startDate, endDate));
+    } else {
+      end = new Date();
+      start = new Date();
+      start.setDate(end.getDate() - 30);
+    }
 
     const entries = await Entry.findAll({
       where: {
@@ -530,10 +555,7 @@ export const getEntriesByDay = async (req, res) => {
         },
       },
       attributes: [
-        [
-          sequelize.fn('DATE', sequelize.col('checkInTime')),
-          'date',
-        ],
+        [sequelize.fn('DATE', sequelize.col('checkInTime')), 'date'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
       ],
       group: [sequelize.fn('DATE', sequelize.col('checkInTime'))],
@@ -563,11 +585,12 @@ export const getEntriesByDay = async (req, res) => {
 export const getTopVisitors = async (req, res) => {
   try {
     const { limit = 10, startDate, endDate } = req.query;
-
     const whereClause = {};
+
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.checkInTime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
@@ -618,11 +641,12 @@ export const getTopVisitors = async (req, res) => {
 export const getEntriesByDepartment = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-
     const whereClause = {};
+
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.checkInTime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
@@ -669,11 +693,12 @@ export const getEntriesByDepartment = async (req, res) => {
 export const getEntriesByPurpose = async (req, res) => {
   try {
     const { startDate, endDate, limit = 10 } = req.query;
-
     const whereClause = {};
+
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.checkInTime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 
@@ -721,11 +746,12 @@ export const getEntriesByPurpose = async (req, res) => {
 export const getPeakHours = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-
     const whereClause = {};
+
     if (startDate && endDate) {
+      const { start, end } = parseDateRange(startDate, endDate);
       whereClause.checkInTime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+        [Op.between]: [start, end],
       };
     }
 

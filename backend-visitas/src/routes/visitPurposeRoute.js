@@ -13,44 +13,44 @@ import { authenticate, checkPermission } from '../middleware/permissions.js';
 const router = express.Router();
 
 router.post('/', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'create'),
+  authenticate, 
+  checkPermission('visit-purposes', 'create'),
   createVisitPurpose
 );
 
 router.get('/', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'view'),
+  authenticate, 
+  checkPermission('visit-purposes', 'view'),
   getAllVisitPurposes
 );
 
 router.get('/active', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'view'),
+  authenticate, 
+  checkPermission('visit-purposes', 'view'),
   getActiveVisitPurposes
 );
 
 router.get('/:id', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'view'),
+  authenticate, 
+  checkPermission('visit-purposes', 'view'),
   getVisitPurposeById
 );
 
 router.put('/:id', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'edit'),
+  authenticate, 
+  checkPermission('visit-purposes', 'edit'),
   updateVisitPurpose
 );
 
 router.delete('/:id', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'delete'),
+  authenticate, 
+  checkPermission('visit-purposes', 'delete'),
   deleteVisitPurpose
 );
 
 router.patch('/:id/toggle', 
-  //authenticate, 
-  //checkPermission('visit-purposes', 'edit'),
+  authenticate, 
+  checkPermission('visit-purposes', 'edit'),
   toggleVisitPurposeStatus
 );
 

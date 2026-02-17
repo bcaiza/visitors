@@ -13,6 +13,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key');
+
     
     req.user = {
       id: decoded.id,
@@ -57,12 +58,6 @@ export const checkPermission = (module, action) => {
       const { permissions } = req.user;
 
       const permission = permissions.find(perm => perm.module === module);
-
-      console.log("=== DEBUG PERMISOS ===");
-      console.log('Módulo solicitado:', module);
-      console.log('Acción solicitada:', action);
-      console.log('Permisos en token:', JSON.stringify(permissions, null, 2));
-      console.log('Permiso encontrado:', permission);
 
       if (!permission) {
         return res.status(403).json({

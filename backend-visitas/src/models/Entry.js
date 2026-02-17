@@ -69,7 +69,8 @@ const Entry = sequelize.define(
     status: {
       type: DataTypes.ENUM('active', 'completed', 'cancelled'),
       defaultValue: 'active',
-      comment: 'active = dentro, completed = salió, cancelled = cancelada',
+      allowNull: true,
+      comment: 'active = dentro, completed = salió, cancelled = cancelada'
     },
     entryNotes: {
       type: DataTypes.TEXT,

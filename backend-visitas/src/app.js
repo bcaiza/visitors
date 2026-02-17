@@ -52,13 +52,13 @@ app.use("/api/visit-purposes", visitPurposeRoute);
 
 async function syncDatabase() {
   try {
-     await models.Role.sync({ alter: true });
-    await models.Department.sync({ force: true });
-    await models.VisitPurpose.sync({ force: true });
-    await models.Visitor.sync({ alter: true });
-    await models.Permission.sync({ alter: true });
-    await models.User.sync({ alter: true });
-    await models.Entry.sync({ force: true });
+   await models.Role.sync();
+    await models.Department.sync();
+    await models.VisitPurpose.sync();
+    await models.Visitor.sync();
+    await models.Permission.sync();
+    await models.User.sync();
+    await models.Entry.sync();
     console.log('🟢 Database synced');
   } catch (err) {
     console.error('❌ Database connection error:', err);

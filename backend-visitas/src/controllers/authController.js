@@ -66,7 +66,7 @@ export const register = async (req, res) => {
         role_id: user.role_id,
         permissions: createdUser.role?.permissions || [] 
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'secret-key',
       { expiresIn: '24h' }
     );
 
@@ -122,9 +122,7 @@ export const login = async (req, res) => {
       });
     }
 
-    console.log('Checking password for:', password);
     const isValidPassword = await bcrypt.compare(password, user.password);
-    console.log('Password valid:', isValidPassword);
 
     if (!isValidPassword) {
       return res.status(401).json({ 
@@ -134,7 +132,6 @@ export const login = async (req, res) => {
 
     const permissions = user.role?.permissions || [];
 
-    console.log('Permissions loaded:', permissions.length);
 
     const token = jwt.sign(
       { 
@@ -149,7 +146,7 @@ export const login = async (req, res) => {
           can_delete: p.can_delete
         }))
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'secret-key',
       { expiresIn: '24h' }
     );
 

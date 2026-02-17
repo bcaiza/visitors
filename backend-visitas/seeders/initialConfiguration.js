@@ -1,9 +1,9 @@
-import User from "../models/User.js";
-import Role from "../models/Role.js";
-import Permission from "../models/Permission.js";
-import Visitor from "../models/Visitor.js";
-import Entry from "../models/Entry.js";
-import sequelize from "../config/database.js";
+import User from "../src/models/User.js";
+import Role from "../src/models/Role.js";
+import Permission from "../src/models/Permission.js";
+import Visitor from "../src/models/Visitor.js";
+import Entry from "../src/models/Entry.js";
+import sequelize from "../src/config/database.js";
 import bcrypt from "bcryptjs";
 
 const MODULES = [
@@ -19,16 +19,7 @@ const MODULES = [
 
 const initializeDatabase = async () => {
   try {
-    // Sync database models
-    console.log("🔄 Syncing database models...");
-    await Role.sync({ alter: true });
-    await Permission.sync({ alter: true });
-    await User.sync({ force: true });
-    await Visitor.sync({ alter: true });
-    await Entry.sync({ force: true }); // Force recreate table to avoid alter issues
-    console.log("🟢 Database synced");
-  
-    // Crear rol Admin
+   
     let adminRole = await Role.findOne({
       where: { name: "Admin" },
     });
@@ -39,7 +30,6 @@ const initializeDatabase = async () => {
         description: "Administrador con acceso completo al sistema",
       });
 
-      // Crear permisos completos para todos los módulos
       const permissions = MODULES.map((module) => ({
         module,
         can_view: true,
@@ -49,7 +39,6 @@ const initializeDatabase = async () => {
         role_id: adminRole.id,
       }));
 
-      // Agregar permiso de auditoría (solo lectura)
       permissions.push({
         module: "audit",
         can_view: true,

@@ -1,15 +1,346 @@
 import { Op } from 'sequelize';
 import ExcelJS from 'exceljs';
+import { createCanvas } from '@napi-rs/canvas';
 import Entry from '../models/Entry.js';
 import Visitor from '../models/Visitor.js';
 import Department from '../models/Department.js';
 import VisitPurpose from '../models/VisitPurpose.js';
 import sequelize from '../config/database.js';
 
+// ==================== HELPER DE FECHAS ====================
+const parseDateRange = (startDate, endDate) => {
+  const start = new Date(`${startDate}T00:00:00.000`);
+  const end = new Date(`${endDate}T23:59:59.999`);
+  return { start, end };
+};
+
+// ==================== HELPERS DE GRÁFICOS ====================
+
 /**
- * GET /reports/dashboard/export-excel
- * Exportar dashboard completo a Excel con múltiples hojas y gráficos
+ * Dibuja un gráfico de barras y devuelve un Buffer PNG
  */
+const renderBarChart = ({ labels, values, title, color = '#4472C4', width = 800, height = 400 }) => {
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const paddingTop = 60;
+  const paddingBottom = 80;
+  const paddingLeft = 70;
+  const paddingRight = 30;
+  const chartW = width - paddingLeft - paddingRight;
+  const chartH = height - paddingTop - paddingBottom;
+
+  // Fondo blanco
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  // Título
+  ctx.fillStyle = '#333333';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, width / 2, 35);
+
+  const maxVal = Math.max(...values, 1);
+  const barWidth = Math.max(10, (chartW / labels.length) * 0.6);
+  const barGap = chartW / labels.length;
+
+  // Líneas de cuadrícula
+  const gridLines = 5;
+  ctx.strokeStyle = '#e8e8e8';
+  ctx.lineWidth = 1;
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#888888';
+
+  for (let i = 0; i <= gridLines; i++) {
+    const y = paddingTop + chartH - (i / gridLines) * chartH;
+    const val = Math.round((i / gridLines) * maxVal);
+    ctx.beginPath();
+    ctx.moveTo(paddingLeft, y);
+    ctx.lineTo(paddingLeft + chartW, y);
+    ctx.stroke();
+    ctx.fillText(val.toString(), paddingLeft - 8, y + 4);
+  }
+
+  // Eje Y
+  ctx.strokeStyle = '#cccccc';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(paddingLeft, paddingTop);
+  ctx.lineTo(paddingLeft, paddingTop + chartH);
+  ctx.lineTo(paddingLeft + chartW, paddingTop + chartH);
+  ctx.stroke();
+
+  // Barras y etiquetas X
+  labels.forEach((label, i) => {
+    const val = values[i] || 0;
+    const barH = (val / maxVal) * chartH;
+    const x = paddingLeft + i * barGap + (barGap - barWidth) / 2;
+    const y = paddingTop + chartH - barH;
+
+    // Sombra suave
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(x + 3, y + 3, barWidth, barH);
+
+    // Barra
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, barWidth, barH);
+
+    // Valor encima
+    if (val > 0) {
+      ctx.fillStyle = '#333333';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(val.toString(), x + barWidth / 2, y - 6);
+    }
+
+    // Label eje X (rotar si hay muchos)
+    ctx.save();
+    ctx.translate(x + barWidth / 2, paddingTop + chartH + 12);
+    if (labels.length > 8) {
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'right';
+    } else {
+      ctx.textAlign = 'center';
+    }
+    ctx.fillStyle = '#555555';
+    ctx.font = '11px sans-serif';
+    // Truncar labels largos
+    const shortLabel = label.length > 12 ? label.substring(0, 11) + '…' : label;
+    ctx.fillText(shortLabel, 0, 0);
+    ctx.restore();
+  });
+
+  return canvas.toBuffer('image/png');
+};
+
+/**
+ * Dibuja un gráfico de líneas y devuelve un Buffer PNG
+ */
+const renderLineChart = ({ labels, values, title, color = '#1890FF', width = 800, height = 400 }) => {
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const paddingTop = 60;
+  const paddingBottom = 80;
+  const paddingLeft = 70;
+  const paddingRight = 30;
+  const chartW = width - paddingLeft - paddingRight;
+  const chartH = height - paddingTop - paddingBottom;
+
+  // Fondo
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  // Título
+  ctx.fillStyle = '#333333';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, width / 2, 35);
+
+  if (values.length === 0) {
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Sin datos para mostrar', width / 2, height / 2);
+    return canvas.toBuffer('image/png');
+  }
+
+  const maxVal = Math.max(...values, 1);
+  const gridLines = 5;
+
+  // Cuadrícula y eje Y
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#888888';
+  for (let i = 0; i <= gridLines; i++) {
+    const y = paddingTop + chartH - (i / gridLines) * chartH;
+    const val = Math.round((i / gridLines) * maxVal);
+    ctx.strokeStyle = '#e8e8e8';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(paddingLeft, y);
+    ctx.lineTo(paddingLeft + chartW, y);
+    ctx.stroke();
+    ctx.fillText(val.toString(), paddingLeft - 8, y + 4);
+  }
+
+  // Ejes
+  ctx.strokeStyle = '#cccccc';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(paddingLeft, paddingTop);
+  ctx.lineTo(paddingLeft, paddingTop + chartH);
+  ctx.lineTo(paddingLeft + chartW, paddingTop + chartH);
+  ctx.stroke();
+
+  // Área rellena bajo la línea
+  const points = values.map((val, i) => ({
+    x: paddingLeft + (i / Math.max(values.length - 1, 1)) * chartW,
+    y: paddingTop + chartH - (val / maxVal) * chartH,
+  }));
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, paddingTop + chartH);
+  points.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(points[points.length - 1].x, paddingTop + chartH);
+  ctx.closePath();
+  ctx.fillStyle = color.replace(')', ', 0.15)').replace('rgb', 'rgba').replace('#', '').length > 10
+    ? 'rgba(24,144,255,0.12)'
+    : 'rgba(24,144,255,0.12)';
+  ctx.fill();
+
+  // Línea
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+
+  // Puntos
+  points.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Valor
+    ctx.fillStyle = '#333333';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(values[i].toString(), p.x, p.y - 12);
+  });
+
+  // Labels eje X
+  labels.forEach((label, i) => {
+    const x = paddingLeft + (i / Math.max(labels.length - 1, 1)) * chartW;
+    ctx.save();
+    ctx.translate(x, paddingTop + chartH + 12);
+    if (labels.length > 10) {
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'right';
+    } else {
+      ctx.textAlign = 'center';
+    }
+    ctx.fillStyle = '#555555';
+    ctx.font = '11px sans-serif';
+    const shortLabel = label.length > 10 ? label.substring(0, 9) + '…' : label;
+    ctx.fillText(shortLabel, 0, 0);
+    ctx.restore();
+  });
+
+  return canvas.toBuffer('image/png');
+};
+
+/**
+ * Dibuja un gráfico de pastel y devuelve un Buffer PNG
+ */
+const renderPieChart = ({ labels, values, title, width = 600, height = 450 }) => {
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const colors = [
+    '#4472C4', '#ED7D31', '#A9D18E', '#FFC000', '#5B9BD5',
+    '#70AD47', '#FF7C80', '#9E480E', '#636363', '#997300',
+  ];
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = '#333333';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, width / 2, 35);
+
+  const total = values.reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Sin datos', width / 2, height / 2);
+    return canvas.toBuffer('image/png');
+  }
+
+  const centerX = width / 2 - 60;
+  const centerY = height / 2 + 20;
+  const radius = Math.min(width, height) / 2 - 80;
+
+  let startAngle = -Math.PI / 2;
+
+  values.forEach((val, i) => {
+    const slice = (val / total) * 2 * Math.PI;
+    const endAngle = startAngle + slice;
+    const midAngle = startAngle + slice / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Porcentaje dentro del slice si es suficientemente grande
+    if (slice > 0.25) {
+      const textX = centerX + Math.cos(midAngle) * radius * 0.65;
+      const textY = centerY + Math.sin(midAngle) * radius * 0.65;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round((val / total) * 100)}%`, textX, textY);
+    }
+
+    startAngle = endAngle;
+  });
+
+  // Leyenda a la derecha
+  const legendX = width - 170;
+  const legendStartY = 60;
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'left';
+
+  labels.forEach((label, i) => {
+    const ly = legendStartY + i * 24;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(legendX, ly, 14, 14);
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(legendX, ly, 14, 14);
+    ctx.fillStyle = '#333333';
+    const shortLabel = label.length > 16 ? label.substring(0, 15) + '…' : label;
+    ctx.fillText(`${shortLabel} (${values[i]})`, legendX + 20, ly + 11);
+  });
+
+  return canvas.toBuffer('image/png');
+};
+
+/**
+ * Inserta un PNG buffer como imagen en una hoja de Excel
+ * en la celda indicada, con ancho/alto en píxeles de columna/fila aproximados
+ */
+const insertChartImage = async (workbook, worksheet, pngBuffer, anchorCell, widthCols, heightRows) => {
+  const imageId = workbook.addImage({
+    buffer: pngBuffer,
+    extension: 'png',
+  });
+
+  // Calcular rango aproximado (col/row en base 0)
+  const colLetter = anchorCell.match(/[A-Z]+/)[0];
+  const rowNum = parseInt(anchorCell.match(/\d+/)[0]);
+  const colIndex = colLetter.split('').reduce((acc, c) => acc * 26 + c.charCodeAt(0) - 64, 0) - 1;
+
+  worksheet.addImage(imageId, {
+    tl: { col: colIndex, row: rowNum - 1 },
+    br: { col: colIndex + widthCols, row: rowNum - 1 + heightRows },
+  });
+};
+
+// ==================== EXPORTAR DASHBOARD A EXCEL ====================
+
 export const exportDashboardToExcel = async (req, res) => {
   try {
     const {
@@ -24,17 +355,20 @@ export const exportDashboardToExcel = async (req, res) => {
       includeMonthly = true,
     } = req.query;
 
-    // ✅ Fechas con zona horaria correcta
-    const end = endDate ? new Date(endDate + 'T23:59:59.999Z') : new Date();
-    const start = startDate ? new Date(startDate + 'T00:00:00.000Z') : new Date(new Date().setMonth(end.getMonth() - 1));
+    // ✅ Fechas en hora local
+    let start, end;
+    if (startDate && endDate) {
+      ({ start, end } = parseDateRange(startDate, endDate));
+    } else {
+      end = new Date();
+      start = new Date();
+      start.setMonth(end.getMonth() - 1);
+    }
 
     const whereClause = {
-      checkInTime: {
-        [Op.between]: [start, end],
-      },
+      checkInTime: { [Op.between]: [start, end] },
     };
 
-    // Crear workbook
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Sistema de Gestión de Visitantes';
     workbook.created = new Date();
@@ -45,60 +379,41 @@ export const exportDashboardToExcel = async (req, res) => {
         views: [{ showGridLines: false }],
       });
 
-      // Título
       summarySheet.mergeCells('A1:F1');
       summarySheet.getCell('A1').value = 'REPORTE DE DASHBOARD - SISTEMA DE VISITANTES';
       summarySheet.getCell('A1').font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-      summarySheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1890FF' },
-      };
+      summarySheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1890FF' } };
       summarySheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       summarySheet.getRow(1).height = 30;
 
-      // Período
       summarySheet.mergeCells('A2:F2');
       summarySheet.getCell('A2').value = `Período: ${start.toLocaleDateString('es-ES')} - ${end.toLocaleDateString('es-ES')}`;
       summarySheet.getCell('A2').font = { size: 12, italic: true };
       summarySheet.getCell('A2').alignment = { horizontal: 'center' };
       summarySheet.getRow(2).height = 20;
 
-      // Obtener totales
-      const [
-        totalVisitors,
-        totalEntries,
-        activeEntries,
-        completedEntries,
-        cancelledEntries,
-      ] = await Promise.all([
-        Visitor.count(),
-        Entry.count({ where: whereClause }),
-        Entry.count({ where: { ...whereClause, status: 'active' } }),
-        Entry.count({ where: { ...whereClause, status: 'completed' } }),
-        Entry.count({ where: { ...whereClause, status: 'cancelled' } }),
-      ]);
+      const [totalVisitors, totalEntries, activeEntries, completedEntries, cancelledEntries] =
+        await Promise.all([
+          Visitor.count(),
+          Entry.count({ where: whereClause }),
+          Entry.count({ where: { ...whereClause, status: 'active' } }),
+          Entry.count({ where: { ...whereClause, status: 'completed' } }),
+          Entry.count({ where: { ...whereClause, status: 'cancelled' } }),
+        ]);
 
-      // Tiempo promedio
-      const completedEntriesWithTime = await Entry.findAll({
-        where: {
-          ...whereClause,
-          status: 'completed',
-          checkOutTime: { [Op.ne]: null },
-        },
+      const completedWithTime = await Entry.findAll({
+        where: { ...whereClause, status: 'completed', checkOutTime: { [Op.ne]: null } },
         attributes: ['checkInTime', 'checkOutTime'],
       });
 
       let averageStayMinutes = 0;
-      if (completedEntriesWithTime.length > 0) {
-        const totalMinutes = completedEntriesWithTime.reduce((sum, entry) => {
-          const duration = (new Date(entry.checkOutTime) - new Date(entry.checkInTime)) / 1000 / 60;
-          return sum + duration;
+      if (completedWithTime.length > 0) {
+        const totalMinutes = completedWithTime.reduce((sum, entry) => {
+          return sum + (new Date(entry.checkOutTime) - new Date(entry.checkInTime)) / 1000 / 60;
         }, 0);
-        averageStayMinutes = Math.round(totalMinutes / completedEntriesWithTime.length);
+        averageStayMinutes = Math.round(totalMinutes / completedWithTime.length);
       }
 
-      // Estadísticas Principales
       summarySheet.getCell('A4').value = 'ESTADÍSTICAS PRINCIPALES';
       summarySheet.getCell('A4').font = { size: 14, bold: true, color: { argb: 'FF1890FF' } };
       summarySheet.getRow(4).height = 25;
@@ -121,33 +436,20 @@ export const exportDashboardToExcel = async (req, res) => {
 
         if (index === 0) {
           summarySheet.getRow(rowNum).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-          summarySheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FF4472C4' },
-          };
-        } else {
-          if (index % 2 === 0) {
-            summarySheet.getRow(rowNum).fill = {
-              type: 'pattern',
-              pattern: 'solid',
-              fgColor: { argb: 'FFF0F0F0' },
-            };
-          }
+          summarySheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+        } else if (index % 2 === 0) {
+          summarySheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
 
         summarySheet.getRow(rowNum).alignment = { vertical: 'middle' };
         summarySheet.getRow(rowNum).height = 22;
       });
 
-      // Bordes
       for (let i = 5; i <= 11; i++) {
         ['A', 'B', 'C'].forEach(col => {
           summarySheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -155,12 +457,9 @@ export const exportDashboardToExcel = async (req, res) => {
       summarySheet.getColumn('A').width = 35;
       summarySheet.getColumn('B').width = 20;
       summarySheet.getColumn('C').width = 45;
-
-      summarySheet.getCell('B6').numFmt = '#,##0';
-      summarySheet.getCell('B7').numFmt = '#,##0';
-      summarySheet.getCell('B8').numFmt = '#,##0';
-      summarySheet.getCell('B9').numFmt = '#,##0';
-      summarySheet.getCell('B10').numFmt = '#,##0';
+      ['B6', 'B7', 'B8', 'B9', 'B10'].forEach(cell => {
+        summarySheet.getCell(cell).numFmt = '#,##0';
+      });
     }
 
     // ==================== HOJA 2: ENTRADAS POR DÍA ====================
@@ -178,43 +477,31 @@ export const exportDashboardToExcel = async (req, res) => {
         raw: true,
       });
 
+      // Tabla de datos
       entriesSheet.mergeCells('A1:C1');
       entriesSheet.getCell('A1').value = 'ENTRADAS POR DÍA';
       entriesSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      entriesSheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1890FF' },
-      };
+      entriesSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1890FF' } };
       entriesSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       entriesSheet.getRow(1).height = 25;
 
-      entriesSheet.getCell('A3').value = 'Fecha';
-      entriesSheet.getCell('B3').value = 'Día de la Semana';
-      entriesSheet.getCell('C3').value = 'Cantidad de Entradas';
+      ['Fecha', 'Día de la Semana', 'Cantidad'].forEach((h, i) => {
+        const col = ['A', 'B', 'C'][i];
+        entriesSheet.getCell(`${col}3`).value = h;
+      });
       entriesSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      entriesSheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
+      entriesSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
+      const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
       entriesByDay.forEach((entry, index) => {
         const rowNum = 4 + index;
-        const date = new Date(entry.date);
-        const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        
+        const date = new Date(entry.date + 'T12:00:00'); // evitar desplazamiento UTC
         entriesSheet.getCell(`A${rowNum}`).value = date;
         entriesSheet.getCell(`A${rowNum}`).numFmt = 'dd/mm/yyyy';
         entriesSheet.getCell(`B${rowNum}`).value = dayNames[date.getDay()];
         entriesSheet.getCell(`C${rowNum}`).value = parseInt(entry.count);
-
         if (index % 2 === 1) {
-          entriesSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
+          entriesSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
       });
 
@@ -226,19 +513,13 @@ export const exportDashboardToExcel = async (req, res) => {
         result: entriesByDay.reduce((sum, e) => sum + parseInt(e.count), 0),
       };
       entriesSheet.getCell(`C${totalRow}`).font = { bold: true };
-      entriesSheet.getRow(totalRow).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFE699' },
-      };
+      entriesSheet.getRow(totalRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };
 
       for (let i = 3; i <= totalRow; i++) {
         ['A', 'B', 'C'].forEach(col => {
           entriesSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -246,6 +527,25 @@ export const exportDashboardToExcel = async (req, res) => {
       entriesSheet.getColumn('A').width = 15;
       entriesSheet.getColumn('B').width = 20;
       entriesSheet.getColumn('C').width = 20;
+
+      // ✅ Gráfico real
+      const chartLabels = entriesByDay.map(e => {
+        const d = new Date(e.date + 'T12:00:00');
+        return `${d.getDate()}/${d.getMonth() + 1}`;
+      });
+      const chartValues = entriesByDay.map(e => parseInt(e.count));
+      const chartBuffer = renderLineChart({
+        labels: chartLabels,
+        values: chartValues,
+        title: 'Entradas por Día',
+        color: '#1890FF',
+        width: 900,
+        height: 420,
+      });
+
+      // Insertar gráfico en columna E
+      entriesSheet.getColumn('E').width = 15;
+      await insertChartImage(workbook, entriesSheet, chartBuffer, 'E1', 11, 22);
     }
 
     // ==================== HOJA 3: TOP VISITANTES ====================
@@ -262,7 +562,7 @@ export const exportDashboardToExcel = async (req, res) => {
           {
             model: Visitor,
             as: 'visitor',
-            attributes: ['firstName', 'lastName', 'company', 'email', 'phone'],
+            attributes: ['firstName', 'lastName', 'company', 'email'],
           },
         ],
         group: ['visitor_id', 'visitor.id'],
@@ -274,48 +574,31 @@ export const exportDashboardToExcel = async (req, res) => {
       visitorsSheet.mergeCells('A1:F1');
       visitorsSheet.getCell('A1').value = 'TOP 20 VISITANTES MÁS FRECUENTES';
       visitorsSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      visitorsSheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF52C41A' },
-      };
+      visitorsSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF52C41A' } };
       visitorsSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       visitorsSheet.getRow(1).height = 25;
 
-      const headers = ['Ranking', 'Nombre', 'Apellido', 'Empresa', 'Email', 'Cantidad de Visitas'];
-      headers.forEach((header, index) => {
-        const col = String.fromCharCode(65 + index);
-        visitorsSheet.getCell(`${col}3`).value = header;
+      ['Ranking', 'Nombre', 'Apellido', 'Empresa', 'Email', 'Visitas'].forEach((h, i) => {
+        const col = String.fromCharCode(65 + i);
+        visitorsSheet.getCell(`${col}3`).value = h;
       });
       visitorsSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      visitorsSheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
+      visitorsSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
       topVisitors.forEach((entry, index) => {
         const rowNum = 4 + index;
         visitorsSheet.getCell(`A${rowNum}`).value = index + 1;
-        visitorsSheet.getCell(`B${rowNum}`).value = entry.visitor.firstName;
-        visitorsSheet.getCell(`C${rowNum}`).value = entry.visitor.lastName;
-        visitorsSheet.getCell(`D${rowNum}`).value = entry.visitor.company || 'N/A';
-        visitorsSheet.getCell(`E${rowNum}`).value = entry.visitor.email || 'N/A';
+        visitorsSheet.getCell(`B${rowNum}`).value = entry.visitor?.firstName || 'N/A';
+        visitorsSheet.getCell(`C${rowNum}`).value = entry.visitor?.lastName || 'N/A';
+        visitorsSheet.getCell(`D${rowNum}`).value = entry.visitor?.company || 'N/A';
+        visitorsSheet.getCell(`E${rowNum}`).value = entry.visitor?.email || 'N/A';
         visitorsSheet.getCell(`F${rowNum}`).value = parseInt(entry.get('visitCount'));
 
         if (index < 3) {
-          visitorsSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFFFD700' },
-          };
+          visitorsSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD700' } };
           visitorsSheet.getRow(rowNum).font = { bold: true };
         } else if (index % 2 === 1) {
-          visitorsSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
+          visitorsSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
       });
 
@@ -323,10 +606,8 @@ export const exportDashboardToExcel = async (req, res) => {
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C', 'D', 'E', 'F'].forEach(col => {
           visitorsSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -336,7 +617,21 @@ export const exportDashboardToExcel = async (req, res) => {
       visitorsSheet.getColumn('C').width = 20;
       visitorsSheet.getColumn('D').width = 25;
       visitorsSheet.getColumn('E').width = 30;
-      visitorsSheet.getColumn('F').width = 18;
+      visitorsSheet.getColumn('F').width = 10;
+
+      // ✅ Gráfico de barras: Top 10 visitantes
+      const top10 = topVisitors.slice(0, 10);
+      const chartBuffer = renderBarChart({
+        labels: top10.map(e => `${e.visitor?.firstName || ''} ${e.visitor?.lastName || ''}`.trim()),
+        values: top10.map(e => parseInt(e.get('visitCount'))),
+        title: 'Top 10 Visitantes Frecuentes',
+        color: '#52C41A',
+        width: 900,
+        height: 420,
+      });
+
+      visitorsSheet.getColumn('H').width = 15;
+      await insertChartImage(workbook, visitorsSheet, chartBuffer, 'H1', 11, 22);
     }
 
     // ==================== HOJA 4: POR DEPARTAMENTO ====================
@@ -348,17 +643,8 @@ export const exportDashboardToExcel = async (req, res) => {
           'department_id',
           [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
         ],
-        include: [
-          {
-            model: Department,
-            as: 'department',
-            attributes: ['id', 'name'],
-          },
-        ],
-        where: {
-          ...whereClause,
-          department_id: { [Op.ne]: null },
-        },
+        include: [{ model: Department, as: 'department', attributes: ['id', 'name'] }],
+        where: { ...whereClause, department_id: { [Op.ne]: null } },
         group: ['Entry.department_id', 'department.id', 'department.name'],
         order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
         raw: false,
@@ -367,24 +653,16 @@ export const exportDashboardToExcel = async (req, res) => {
       deptSheet.mergeCells('A1:D1');
       deptSheet.getCell('A1').value = 'VISITAS POR DEPARTAMENTO';
       deptSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      deptSheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF722ED1' },
-      };
+      deptSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF722ED1' } };
       deptSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       deptSheet.getRow(1).height = 25;
 
-      deptSheet.getCell('A3').value = 'Departamento';
-      deptSheet.getCell('B3').value = 'Cantidad';
-      deptSheet.getCell('C3').value = 'Porcentaje';
-      deptSheet.getCell('D3').value = 'Gráfico';
+      ['Departamento', 'Cantidad', 'Porcentaje', 'Barra'].forEach((h, i) => {
+        const col = ['A', 'B', 'C', 'D'][i];
+        deptSheet.getCell(`${col}3`).value = h;
+      });
       deptSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      deptSheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
+      deptSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
       const totalDept = byDepartment.reduce((sum, d) => sum + parseInt(d.getDataValue('count')), 0);
 
@@ -392,21 +670,13 @@ export const exportDashboardToExcel = async (req, res) => {
         const rowNum = 4 + index;
         const count = parseInt(entry.getDataValue('count'));
         const percentage = (count / totalDept) * 100;
-
         deptSheet.getCell(`A${rowNum}`).value = entry.department?.name || 'Sin departamento';
         deptSheet.getCell(`B${rowNum}`).value = count;
         deptSheet.getCell(`C${rowNum}`).value = percentage / 100;
         deptSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
-
-        const barLength = Math.round((percentage / 100) * 20);
-        deptSheet.getCell(`D${rowNum}`).value = '█'.repeat(barLength);
-
+        deptSheet.getCell(`D${rowNum}`).value = '█'.repeat(Math.round((percentage / 100) * 20));
         if (index % 2 === 1) {
-          deptSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
+          deptSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
       });
 
@@ -417,20 +687,13 @@ export const exportDashboardToExcel = async (req, res) => {
       deptSheet.getCell(`B${totalRow}`).font = { bold: true };
       deptSheet.getCell(`C${totalRow}`).value = 1;
       deptSheet.getCell(`C${totalRow}`).numFmt = '0.0%';
-      deptSheet.getCell(`C${totalRow}`).font = { bold: true };
-      deptSheet.getRow(totalRow).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFE699' },
-      };
+      deptSheet.getRow(totalRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };
 
       for (let i = 3; i <= totalRow; i++) {
         ['A', 'B', 'C', 'D'].forEach(col => {
           deptSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -439,6 +702,18 @@ export const exportDashboardToExcel = async (req, res) => {
       deptSheet.getColumn('B').width = 15;
       deptSheet.getColumn('C').width = 15;
       deptSheet.getColumn('D').width = 30;
+
+      // ✅ Gráfico de pastel
+      const chartBuffer = renderPieChart({
+        labels: byDepartment.map(e => e.department?.name || 'Sin departamento'),
+        values: byDepartment.map(e => parseInt(e.getDataValue('count'))),
+        title: 'Visitas por Departamento',
+        width: 700,
+        height: 450,
+      });
+
+      deptSheet.getColumn('F').width = 15;
+      await insertChartImage(workbook, deptSheet, chartBuffer, 'F1', 10, 25);
     }
 
     // ==================== HOJA 5: POR MOTIVO ====================
@@ -450,17 +725,8 @@ export const exportDashboardToExcel = async (req, res) => {
           'purpose_id',
           [sequelize.fn('COUNT', sequelize.col('Entry.id')), 'count'],
         ],
-        include: [
-          {
-            model: VisitPurpose,
-            as: 'purpose',
-            attributes: ['id', 'name'],
-          },
-        ],
-        where: {
-          ...whereClause,
-          purpose_id: { [Op.ne]: null },
-        },
+        include: [{ model: VisitPurpose, as: 'purpose', attributes: ['id', 'name'] }],
+        where: { ...whereClause, purpose_id: { [Op.ne]: null } },
         group: ['Entry.purpose_id', 'purpose.id', 'purpose.name'],
         order: [[sequelize.fn('COUNT', sequelize.col('Entry.id')), 'DESC']],
         limit: 15,
@@ -470,42 +736,28 @@ export const exportDashboardToExcel = async (req, res) => {
       purposeSheet.mergeCells('A1:C1');
       purposeSheet.getCell('A1').value = 'MOTIVOS DE VISITA';
       purposeSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      purposeSheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFA8C16' },
-      };
+      purposeSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFA8C16' } };
       purposeSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       purposeSheet.getRow(1).height = 25;
 
-      purposeSheet.getCell('A3').value = 'Motivo';
-      purposeSheet.getCell('B3').value = 'Cantidad';
-      purposeSheet.getCell('C3').value = 'Porcentaje';
+      ['Motivo', 'Cantidad', 'Porcentaje'].forEach((h, i) => {
+        const col = ['A', 'B', 'C'][i];
+        purposeSheet.getCell(`${col}3`).value = h;
+      });
       purposeSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      purposeSheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
+      purposeSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
       const totalPurpose = byPurpose.reduce((sum, p) => sum + parseInt(p.getDataValue('count')), 0);
 
       byPurpose.forEach((entry, index) => {
         const rowNum = 4 + index;
         const count = parseInt(entry.getDataValue('count'));
-        const percentage = (count / totalPurpose) * 100;
-
         purposeSheet.getCell(`A${rowNum}`).value = entry.purpose?.name || 'Sin motivo';
         purposeSheet.getCell(`B${rowNum}`).value = count;
-        purposeSheet.getCell(`C${rowNum}`).value = percentage / 100;
+        purposeSheet.getCell(`C${rowNum}`).value = (count / totalPurpose);
         purposeSheet.getCell(`C${rowNum}`).numFmt = '0.0%';
-
         if (index % 2 === 1) {
-          purposeSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
+          purposeSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
       });
 
@@ -513,10 +765,8 @@ export const exportDashboardToExcel = async (req, res) => {
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C'].forEach(col => {
           purposeSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -524,10 +774,23 @@ export const exportDashboardToExcel = async (req, res) => {
       purposeSheet.getColumn('A').width = 40;
       purposeSheet.getColumn('B').width = 15;
       purposeSheet.getColumn('C').width = 15;
+
+      // ✅ Gráfico de barras horizontales (barras normales con labels de motivo)
+      const chartBuffer = renderBarChart({
+        labels: byPurpose.map(e => e.purpose?.name || 'Sin motivo'),
+        values: byPurpose.map(e => parseInt(e.getDataValue('count'))),
+        title: 'Motivos de Visita',
+        color: '#FA8C16',
+        width: 900,
+        height: 420,
+      });
+
+      purposeSheet.getColumn('E').width = 15;
+      await insertChartImage(workbook, purposeSheet, chartBuffer, 'E1', 11, 24);
     }
 
     // ==================== HOJA 6: HORAS PICO ====================
-    if (includePeakHours) {
+   if (includePeakHours) {
       const hoursSheet = workbook.addWorksheet('Horas Pico');
 
       const peakHours = await Entry.findAll({
@@ -541,70 +804,45 @@ export const exportDashboardToExcel = async (req, res) => {
         raw: true,
       });
 
-      hoursSheet.mergeCells('A1:D1');
+      hoursSheet.mergeCells('A1:C1');
       hoursSheet.getCell('A1').value = 'HORAS PICO DE ENTRADA';
       hoursSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      hoursSheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF13C2C2' },
-      };
+      hoursSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF13C2C2' } };
       hoursSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       hoursSheet.getRow(1).height = 25;
 
-      hoursSheet.getCell('A3').value = 'Hora';
-      hoursSheet.getCell('B3').value = 'Rango';
-      hoursSheet.getCell('C3').value = 'Cantidad';
-      hoursSheet.getCell('D3').value = 'Visualización';
+      ['Hora', 'Rango', 'Cantidad'].forEach((h, i) => {
+        const col = ['A', 'B', 'C'][i];
+        hoursSheet.getCell(`${col}3`).value = h;
+      });
       hoursSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      hoursSheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
+      hoursSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
       const sortedHours = peakHours.sort((a, b) => a.hour - b.hour);
-      const maxCount = Math.max(...sortedHours.map(h => parseInt(h.count)));
+      const maxCount = Math.max(...sortedHours.map(h => parseInt(h.count)), 1);
 
       sortedHours.forEach((hour, index) => {
         const rowNum = 4 + index;
         const count = parseInt(hour.count);
-        const hourNum = parseInt(hour.hour);
-
-        hoursSheet.getCell(`A${rowNum}`).value = `${hourNum}:00`;
-        hoursSheet.getCell(`B${rowNum}`).value = `${hourNum}:00 - ${hourNum + 1}:00`;
+        const h = parseInt(hour.hour);
+        hoursSheet.getCell(`A${rowNum}`).value = `${h}:00`;
+        hoursSheet.getCell(`B${rowNum}`).value = `${h}:00 - ${h + 1}:00`;
         hoursSheet.getCell(`C${rowNum}`).value = count;
 
-        const barLength = Math.round((count / maxCount) * 30);
-        hoursSheet.getCell(`D${rowNum}`).value = '▓'.repeat(barLength);
-        hoursSheet.getCell(`D${rowNum}`).font = { color: { argb: 'FF52C41A' } };
-
-        if (index % 2 === 1) {
-          hoursSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
-        }
-
         if (count === maxCount) {
-          hoursSheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFFFE699' },
-          };
+          hoursSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };
           hoursSheet.getRow(rowNum).font = { bold: true };
+        } else if (index % 2 === 1) {
+          hoursSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
       });
 
       const lastRow = 3 + sortedHours.length;
       for (let i = 3; i <= lastRow; i++) {
-        ['A', 'B', 'C', 'D'].forEach(col => {
+        ['A', 'B', 'C'].forEach(col => {
           hoursSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -612,9 +850,20 @@ export const exportDashboardToExcel = async (req, res) => {
       hoursSheet.getColumn('A').width = 12;
       hoursSheet.getColumn('B').width = 20;
       hoursSheet.getColumn('C').width = 15;
-      hoursSheet.getColumn('D').width = 40;
-    }
 
+      // Gráfico de barras por hora
+      const chartBuffer = renderBarChart({
+        labels: sortedHours.map(h => `${parseInt(h.hour)}:00`),
+        values: sortedHours.map(h => parseInt(h.count)),
+        title: 'Distribución de Entradas por Hora',
+        color: '#13C2C2',
+        width: 900,
+        height: 420,
+      });
+
+      hoursSheet.getColumn('E').width = 15;
+      await insertChartImage(workbook, hoursSheet, chartBuffer, 'E1', 11, 24);
+    }
     // ==================== HOJA 7: TENDENCIA MENSUAL ====================
     if (includeMonthly) {
       const monthlySheet = workbook.addWorksheet('Tendencia Mensual');
@@ -623,11 +872,7 @@ export const exportDashboardToExcel = async (req, res) => {
       monthsAgo.setMonth(monthsAgo.getMonth() - 6);
 
       const monthlyData = await Entry.findAll({
-        where: {
-          checkInTime: {
-            [Op.gte]: monthsAgo,
-          },
-        },
+        where: { checkInTime: { [Op.gte]: monthsAgo } },
         attributes: [
           [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('checkInTime')), 'month'],
           [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
@@ -640,32 +885,25 @@ export const exportDashboardToExcel = async (req, res) => {
       monthlySheet.mergeCells('A1:C1');
       monthlySheet.getCell('A1').value = 'TENDENCIA MENSUAL';
       monthlySheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      monthlySheet.getCell('A1').fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF9254DE' },
-      };
+      monthlySheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9254DE' } };
       monthlySheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       monthlySheet.getRow(1).height = 25;
 
-      monthlySheet.getCell('A3').value = 'Mes';
-      monthlySheet.getCell('B3').value = 'Cantidad de Entradas';
-      monthlySheet.getCell('C3').value = 'Variación vs. Anterior';
+      ['Mes', 'Entradas', 'Variación vs. Anterior'].forEach((h, i) => {
+        const col = ['A', 'B', 'C'][i];
+        monthlySheet.getCell(`${col}3`).value = h;
+      });
       monthlySheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      monthlySheet.getRow(3).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF4472C4' },
-      };
+      monthlySheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
 
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
       let previousCount = null;
 
       monthlyData.forEach((month, index) => {
         const rowNum = 4 + index;
         const count = parseInt(month.count);
         const date = new Date(month.month);
-        const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
         monthlySheet.getCell(`A${rowNum}`).value = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
         monthlySheet.getCell(`B${rowNum}`).value = count;
 
@@ -673,24 +911,16 @@ export const exportDashboardToExcel = async (req, res) => {
           const variation = ((count - previousCount) / previousCount) * 100;
           monthlySheet.getCell(`C${rowNum}`).value = variation / 100;
           monthlySheet.getCell(`C${rowNum}`).numFmt = '0.0%';
-          
-          if (variation > 0) {
-            monthlySheet.getCell(`C${rowNum}`).font = { color: { argb: 'FF52C41A' } };
-          } else if (variation < 0) {
-            monthlySheet.getCell(`C${rowNum}`).font = { color: { argb: 'FFFF4D4F' } };
-          }
+          monthlySheet.getCell(`C${rowNum}`).font = {
+            color: { argb: variation > 0 ? 'FF52C41A' : 'FFFF4D4F' },
+          };
         } else {
           monthlySheet.getCell(`C${rowNum}`).value = '-';
         }
 
         previousCount = count;
-
         if (index % 2 === 1) {
-          monthlySheet.getRow(rowNum).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF0F0F0' },
-          };
+          monthlySheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
         }
       });
 
@@ -698,10 +928,8 @@ export const exportDashboardToExcel = async (req, res) => {
       for (let i = 3; i <= lastRow; i++) {
         ['A', 'B', 'C'].forEach(col => {
           monthlySheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' },
           };
         });
       }
@@ -709,17 +937,27 @@ export const exportDashboardToExcel = async (req, res) => {
       monthlySheet.getColumn('A').width = 25;
       monthlySheet.getColumn('B').width = 20;
       monthlySheet.getColumn('C').width = 25;
+
+      // ✅ Gráfico de líneas mensual
+      const chartBuffer = renderLineChart({
+        labels: monthlyData.map(m => {
+          const d = new Date(m.month);
+          return `${monthNames[d.getMonth()].substring(0, 3)} ${d.getFullYear()}`;
+        }),
+        values: monthlyData.map(m => parseInt(m.count)),
+        title: 'Tendencia Mensual de Entradas',
+        color: '#9254DE',
+        width: 900,
+        height: 420,
+      });
+
+      monthlySheet.getColumn('E').width = 15;
+      await insertChartImage(workbook, monthlySheet, chartBuffer, 'E1', 11, 24);
     }
 
-    // Configurar respuesta
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    );
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=dashboard_${new Date().toISOString().split('T')[0]}.xlsx`
-    );
+    // Enviar respuesta
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
 
     await workbook.xlsx.write(res);
     res.end();

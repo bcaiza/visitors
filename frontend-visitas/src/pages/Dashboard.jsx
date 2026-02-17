@@ -51,11 +51,9 @@ const { RangePicker } = DatePicker;
 const Dashboard = () => {
   const { isDark } = useTheme();
 
-  // -------------------- STATE --------------------
-  const [loading, setLoading] = useState(false); // ✅ CAMBIO: false inicialmente
+  const [loading, setLoading] = useState(false); 
   const [exporting, setExporting] = useState(false);
 
-  // ✅ FECHAS POR DEFECTO: Últimos 30 días
   const [dateRange, setDateRange] = useState([
     dayjs().subtract(30, 'day'),
     dayjs(),
@@ -80,12 +78,10 @@ const Dashboard = () => {
   const [peakHours, setPeakHours] = useState([]);
   const [monthlyData, setMonthlyData] = useState([]);
 
-  // -------------------- EFFECT --------------------
-  // ✅ CARGA AUTOMÁTICA AL MONTAR EL COMPONENTE
+
   useEffect(() => {
     loadDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Solo se ejecuta una vez al montar
+  }, []);
 
   // -------------------- FUNCTIONS --------------------
  const loadDashboardData = async (customRange = null) => {
@@ -100,11 +96,9 @@ const Dashboard = () => {
   try {
     const params = {
       startDate: range[0].format('YYYY-MM-DD'),
-      // ✅ AGREGA UN DÍA AL FINAL PARA INCLUIR TODO EL DÍA
       endDate: range[1].add(1, 'day').format('YYYY-MM-DD'),
     };
 
-    console.log('🔍 Cargando dashboard con parámetros:', params);
 
     const data = await reportService.getAllDashboardData(params);
 
