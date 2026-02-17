@@ -43,7 +43,6 @@ export const exportVisitorsToExcel = async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    console.log('Visitantes a exportar:', visitors.length);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Visitantes');
@@ -136,7 +135,6 @@ export const exportEntriesToExcel = async (req, res) => {
       whereClause.status = status;
     }
 
-    console.log('Criterios de filtrado:', whereClause);
 
     const entries = await Entry.findAll({
       where: whereClause,
@@ -163,7 +161,6 @@ export const exportEntriesToExcel = async (req, res) => {
       order: [['checkInTime', 'DESC']],
     });
 
-    console.log('Entradas a exportar:', entries.length);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Entradas y Salidas');
@@ -549,19 +546,30 @@ export const getEntriesByDay = async (req, res) => {
     }
 
     const entries = await Entry.findAll({
-      where: {
-        checkInTime: {
-          [Op.between]: [start, end],
-        },
-      },
-      attributes: [
-        [sequelize.fn('DATE', sequelize.col('checkInTime')), 'date'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-      ],
-      group: [sequelize.fn('DATE', sequelize.col('checkInTime'))],
-      order: [[sequelize.fn('DATE', sequelize.col('checkInTime')), 'ASC']],
-      raw: true,
-    });
+  where: {
+    checkInTime: {
+      [Op.between]: [start, end],
+    },
+  },
+  attributes: [
+    [
+      sequelize.fn(
+        'DATE',
+        sequelize.literal(`("checkInTime" AT TIME ZONE 'America/Bogota')`)
+      ),
+      'date',
+    ],
+    [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+  ],
+  group: [
+    sequelize.literal(`DATE("checkInTime" AT TIME ZONE 'America/Bogota')`),
+  ],
+  order: [
+    sequelize.literal(`DATE("checkInTime" AT TIME ZONE 'America/Bogota') ASC`),
+  ],
+  raw: true,
+});
+
 
     res.json({
       data: entries.map((entry) => ({
@@ -756,15 +764,26 @@ export const getPeakHours = async (req, res) => {
     }
 
     const peakHours = await Entry.findAll({
-      where: whereClause,
-      attributes: [
-        [sequelize.fn('EXTRACT', sequelize.literal('HOUR FROM "checkInTime"')), 'hour'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-      ],
-      group: [sequelize.fn('EXTRACT', sequelize.literal('HOUR FROM "checkInTime"'))],
-      order: [[sequelize.fn('EXTRACT', sequelize.literal('HOUR FROM "checkInTime"')), 'ASC']],
-      raw: true,
-    });
+  where: whereClause,
+  attributes: [
+    [
+      sequelize.fn(
+        'EXTRACT',
+        sequelize.literal(`HOUR FROM ("checkInTime" AT TIME ZONE 'America/Bogota')`)
+      ),
+      'hour',
+    ],
+    [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+  ],
+  group: [
+    sequelize.literal(`EXTRACT(HOUR FROM ("checkInTime" AT TIME ZONE 'America/Bogota'))`),
+  ],
+  order: [
+    sequelize.literal(`EXTRACT(HOUR FROM ("checkInTime" AT TIME ZONE 'America/Bogota')) ASC`),
+  ],
+  raw: true,
+});
+
 
     res.json({
       hours: peakHours.map((h) => ({
@@ -793,19 +812,30 @@ export const getMonthlyComparison = async (req, res) => {
     monthsAgo.setMonth(monthsAgo.getMonth() - parseInt(months));
 
     const monthlyData = await Entry.findAll({
-      where: {
-        checkInTime: {
-          [Op.gte]: monthsAgo,
-        },
-      },
-      attributes: [
-        [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('checkInTime')), 'month'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-      ],
-      group: [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('checkInTime'))],
-      order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('checkInTime')), 'ASC']],
-      raw: true,
-    });
+  where: {
+    checkInTime: {
+      [Op.gte]: monthsAgo,
+    },
+  },
+  attributes: [
+    [
+      sequelize.fn(
+        'DATE_TRUNC',
+        'month',
+        sequelize.literal(`("checkInTime" AT TIME ZONE 'America/Bogota')`)
+      ),
+      'month',
+    ],
+    [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+  ],
+  group: [
+    sequelize.literal(`DATE_TRUNC('month', "checkInTime" AT TIME ZONE 'America/Bogota')`),
+  ],
+  order: [
+    sequelize.literal(`DATE_TRUNC('month', "checkInTime" AT TIME ZONE 'America/Bogota') ASC`),
+  ],
+  raw: true,
+});
 
     res.json({
       months: monthlyData.map((m) => ({

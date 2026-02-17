@@ -790,80 +790,105 @@ export const exportDashboardToExcel = async (req, res) => {
     }
 
     // ==================== HOJA 6: HORAS PICO ====================
-   if (includePeakHours) {
-      const hoursSheet = workbook.addWorksheet('Horas Pico');
+    if (includePeakHours) {
+  const hoursSheet = workbook.addWorksheet('Horas Pico');
 
-      const peakHours = await Entry.findAll({
-        where: whereClause,
-        attributes: [
-          [sequelize.fn('EXTRACT', sequelize.literal('HOUR FROM "checkInTime"')), 'hour'],
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        ],
-        group: [sequelize.fn('EXTRACT', sequelize.literal('HOUR FROM "checkInTime"'))],
-        order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
-        raw: true,
-      });
+  const peakHours = await Entry.findAll({
+    where: whereClause,
+    attributes: [
+      [
+        sequelize.fn(
+          'EXTRACT',
+          sequelize.literal(`HOUR FROM ("checkInTime" AT TIME ZONE 'America/Bogota')`)
+        ),
+        'hour',
+      ],
+      [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+    ],
+    group: [
+      sequelize.literal(`EXTRACT(HOUR FROM ("checkInTime" AT TIME ZONE 'America/Bogota'))`),
+    ],
+    order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+    raw: true,
+  });
 
-      hoursSheet.mergeCells('A1:C1');
-      hoursSheet.getCell('A1').value = 'HORAS PICO DE ENTRADA';
-      hoursSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      hoursSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF13C2C2' } };
-      hoursSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-      hoursSheet.getRow(1).height = 25;
+  hoursSheet.mergeCells('A1:C1');
+  hoursSheet.getCell('A1').value = 'HORAS PICO DE ENTRADA';
+  hoursSheet.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  hoursSheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF13C2C2' } };
+  hoursSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+  hoursSheet.getRow(1).height = 25;
 
-      ['Hora', 'Rango', 'Cantidad'].forEach((h, i) => {
-        const col = ['A', 'B', 'C'][i];
-        hoursSheet.getCell(`${col}3`).value = h;
-      });
-      hoursSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      hoursSheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+  ['Hora', 'Rango', 'Cantidad'].forEach((h, i) => {
+    const col = ['A', 'B', 'C'][i];
+    const cell = hoursSheet.getCell(`${col}2`);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = {
+      top: { style: 'thin' }, left: { style: 'thin' },
+      bottom: { style: 'thin' }, right: { style: 'thin' },
+    };
+  });
+  hoursSheet.getRow(2).height = 20;
 
-      const sortedHours = peakHours.sort((a, b) => a.hour - b.hour);
-      const maxCount = Math.max(...sortedHours.map(h => parseInt(h.count)), 1);
+  const sortedHours = peakHours.sort((a, b) => a.hour - b.hour);
+  const maxCount = Math.max(...sortedHours.map(h => parseInt(h.count)), 1);
 
-      sortedHours.forEach((hour, index) => {
-        const rowNum = 4 + index;
-        const count = parseInt(hour.count);
-        const h = parseInt(hour.hour);
-        hoursSheet.getCell(`A${rowNum}`).value = `${h}:00`;
-        hoursSheet.getCell(`B${rowNum}`).value = `${h}:00 - ${h + 1}:00`;
-        hoursSheet.getCell(`C${rowNum}`).value = count;
+  sortedHours.forEach((hour, index) => {
+    const rowNum = 3 + index;
+    const count = parseInt(hour.count);
+    const h = parseInt(hour.hour);
 
-        if (count === maxCount) {
-          hoursSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE699' } };
-          hoursSheet.getRow(rowNum).font = { bold: true };
-        } else if (index % 2 === 1) {
-          hoursSheet.getRow(rowNum).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
-        }
-      });
+    const cellA = hoursSheet.getCell(`A${rowNum}`);
+    const cellB = hoursSheet.getCell(`B${rowNum}`);
+    const cellC = hoursSheet.getCell(`C${rowNum}`);
 
-      const lastRow = 3 + sortedHours.length;
-      for (let i = 3; i <= lastRow; i++) {
-        ['A', 'B', 'C'].forEach(col => {
-          hoursSheet.getCell(`${col}${i}`).border = {
-            top: { style: 'thin' }, left: { style: 'thin' },
-            bottom: { style: 'thin' }, right: { style: 'thin' },
-          };
-        });
-      }
+    cellA.value = `${String(h).padStart(2, '0')}:00`;
+    cellB.value = `${String(h).padStart(2, '0')}:00 - ${String(h + 1).padStart(2, '0')}:00`;
+    cellC.value = count;
 
-      hoursSheet.getColumn('A').width = 12;
-      hoursSheet.getColumn('B').width = 20;
-      hoursSheet.getColumn('C').width = 15;
+    let fillColor = null;
+    let isBold = false;
 
-      // Gráfico de barras por hora
-      const chartBuffer = renderBarChart({
-        labels: sortedHours.map(h => `${parseInt(h.hour)}:00`),
-        values: sortedHours.map(h => parseInt(h.count)),
-        title: 'Distribución de Entradas por Hora',
-        color: '#13C2C2',
-        width: 900,
-        height: 420,
-      });
-
-      hoursSheet.getColumn('E').width = 15;
-      await insertChartImage(workbook, hoursSheet, chartBuffer, 'E1', 11, 24);
+    if (count === maxCount) {
+      fillColor = 'FFFFE699';
+      isBold = true;
+    } else if (index % 2 === 1) {
+      fillColor = 'FFF0F0F0';
     }
+
+    [cellA, cellB, cellC].forEach(cell => {
+      if (fillColor) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+      }
+      if (isBold) {
+        cell.font = { bold: true };
+      }
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' },
+      };
+    });
+  });
+
+  hoursSheet.getColumn('A').width = 12;
+  hoursSheet.getColumn('B').width = 22;
+  hoursSheet.getColumn('C').width = 15;
+
+  const chartBuffer = renderBarChart({
+    labels: sortedHours.map(h => `${String(parseInt(h.hour)).padStart(2, '0')}:00`),
+    values: sortedHours.map(h => parseInt(h.count)),
+    title: 'Distribución de Entradas por Hora',
+    color: '#13C2C2',
+    width: 900,
+    height: 420,
+  });
+
+  hoursSheet.getColumn('E').width = 15;
+  await insertChartImage(workbook, hoursSheet, chartBuffer, 'E1', 11, 24);
+}
     // ==================== HOJA 7: TENDENCIA MENSUAL ====================
     if (includeMonthly) {
       const monthlySheet = workbook.addWorksheet('Tendencia Mensual');
